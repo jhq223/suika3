@@ -44,6 +44,6 @@ struct hal_wfile {
 	FILE *fp;
 };
 
-bool suika3_run(const char *base_path);
+bool suika3_run(const char *base_path, const char *title_id);
 
 #endif

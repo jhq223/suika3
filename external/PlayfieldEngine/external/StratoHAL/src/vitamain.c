@@ -78,6 +78,12 @@ const char *vita_base_path;
 #define PATH_SIZE	(1024)
 
 /*
+ * PS Vita save data path (built at runtime from title_id parameter).
+ * Commercial games use ux0:user/00/savedata/<TITLE_ID>/
+ */
+static char vita_savedata_dir[PATH_SIZE];
+
+/*
  * External declarations (from other vita modules)
  */
 extern bool init_file(void);
@@ -173,16 +179,21 @@ extern void update_vitagamepad(void);
   }
 
   bool
-  suika3_run(const char *bp)
+  suika3_run(const char *bp, const char *title_id)
   {
         char test_path[PATH_SIZE];
 
         vita_base_path = bp;
 
-        /* Make sure ux0:data/suika3/ exists for debug log */
-        mkdir("ux0:data/suika3", 0777);
+        /* Build savedata path from runtime title_id. */
+        snprintf(vita_savedata_dir, PATH_SIZE, "ux0:user/00/savedata/%s",
+                 title_id ? title_id : "SUIKA0001");
 
-        dbg = fopen("ux0:data/suika3/debug.log", "w");
+        /* Make sure save data directory exists for debug log. */
+        mkdir(vita_savedata_dir, 0755);
+
+        snprintf(test_path, PATH_SIZE, "%s/debug.log", vita_savedata_dir);
+        dbg = fopen(test_path, "w");
 
         dbg_write("[suika3] Step 1: vglInit...");
         vglInit(0x800000);
@@ -323,7 +334,9 @@ hal_log_warn(
         va_end(ap);
 
         /* Also write to debug log */
-        FILE *d = fopen("ux0:data/suika3/debug.log", "a");
+        char err_path[PATH_SIZE];
+        snprintf(err_path, PATH_SIZE, "%s/debug.log", vita_savedata_dir);
+        FILE *d = fopen(err_path, "a");
         if (d) {
                 fprintf(d, "[ERROR] %s\n", buf);
                 fclose(d);
@@ -683,7 +696,9 @@ hal_render_image_3d_cross(
 bool
 hal_make_save_directory(void)
 {
-	/* PS Vita saves go under ux0:data/, created by the file HAL. */
+	/* PS Vita saves go under ux0:user/00/savedata/<TITLE_ID>/ */
+	mkdir("ux0:user/00/savedata", 0755);
+	mkdir(vita_savedata_dir, 0755);
 	return true;
 }
 
@@ -691,7 +706,7 @@ hal_make_save_directory(void)
  * Convert a logical file name to a real filesystem path.
  *
  * Path resolution:
- *   "save/..." → "ux0:data/suika3/save/..."
+ *   "save/..." → "ux0:user/00/savedata/<TITLE_ID>/..."
  *   Others      → "app0:/..." (read-only VPK content)
  */
 char *
@@ -708,7 +723,7 @@ hal_make_real_path(
 
 	if (strncmp(fname, "save/", 5) == 0 ||
 	    strncmp(fname, "save", 4) == 0) {
-		snprintf(path, PATH_SIZE, "ux0:data/suika3/%s", fname);
+		snprintf(path, PATH_SIZE, "%s/%s", vita_savedata_dir, fname);
 	} else if (fname[0] == '/' || strchr(fname, ':') != NULL) {
 		snprintf(path, PATH_SIZE, "%s", fname);
 	} else {

@@ -43,6 +43,7 @@ static uint32_t prev_buttons;
  */
 static int touch_start_x;
 static int touch_start_y;
+static int touch_last_x;
 static int touch_last_y;
 static bool is_touching;
 static bool is_continuous_swipe_enabled;
@@ -61,6 +62,7 @@ init_vitagamepad(void)
 
 /*
  * Map a PS Vita button to a HAL key code.
+ * Returns -1 for buttons handled separately.
  */
 static int
 map_button_to_key(uint32_t button)
@@ -68,10 +70,7 @@ map_button_to_key(uint32_t button)
 	switch (button) {
 	case SCE_CTRL_CROSS:		return HAL_KEY_GAMEPAD_A;
 	case SCE_CTRL_CIRCLE:		return HAL_KEY_GAMEPAD_B;
-	case SCE_CTRL_TRIANGLE:		return HAL_KEY_GAMEPAD_Y;
-	case SCE_CTRL_SQUARE:		return HAL_KEY_GAMEPAD_X;
-	case SCE_CTRL_LTRIGGER:		return HAL_KEY_GAMEPAD_L;
-	case SCE_CTRL_RTRIGGER:		return HAL_KEY_GAMEPAD_R;
+	case SCE_CTRL_TRIANGLE:		return HAL_KEY_GAMEPAD_X;	/* system menu */
 	case SCE_CTRL_UP:		return HAL_KEY_GAMEPAD_UP;
 	case SCE_CTRL_DOWN:		return HAL_KEY_GAMEPAD_DOWN;
 	case SCE_CTRL_LEFT:		return HAL_KEY_GAMEPAD_LEFT;
@@ -82,13 +81,22 @@ map_button_to_key(uint32_t button)
 
 /*
  * Process button state changes.
+ *
+ * Mapping (Japanese VN convention):
+ *   CROSS     → Confirm / Advance       (GAMEPAD_A → left click)
+ *   CIRCLE    → Cancel / Hide UI        (GAMEPAD_B → right click)
+ *   TRIANGLE  → System Menu             (GAMEPAD_X → Escape)
+ *   SQUARE    → History / Backlog       (HAL_KEY_L)
+ *   L         → (unused — engine has no Auto-mode key)
+ *   R         → Skip toggle             (HAL_KEY_S)
+ *   START     → System Menu             (HAL_KEY_ESCAPE)
+ *   SELECT    → Quick Save placeholder  (HAL_KEY_L — engine has no quick-save key)
  */
 static void
 process_buttons(uint32_t buttons)
 {
 	static const uint32_t all_buttons[] = {
-		SCE_CTRL_CROSS, SCE_CTRL_CIRCLE, SCE_CTRL_TRIANGLE, SCE_CTRL_SQUARE,
-		SCE_CTRL_LTRIGGER, SCE_CTRL_RTRIGGER,
+		SCE_CTRL_CROSS, SCE_CTRL_CIRCLE, SCE_CTRL_TRIANGLE,
 		SCE_CTRL_UP, SCE_CTRL_DOWN, SCE_CTRL_LEFT, SCE_CTRL_RIGHT,
 	};
 	uint32_t changed;
@@ -107,6 +115,41 @@ process_buttons(uint32_t buttons)
 			else
 				hal_callback_on_event_key_release(key);
 		}
+	}
+
+	/* SQUARE → History / Backlog */
+	if (changed & SCE_CTRL_SQUARE) {
+		if (buttons & SCE_CTRL_SQUARE)
+			hal_callback_on_event_key_press(HAL_KEY_L);
+		else
+			hal_callback_on_event_key_release(HAL_KEY_L);
+	}
+
+	/* R → Skip toggle */
+	if (changed & SCE_CTRL_RTRIGGER) {
+		if (buttons & SCE_CTRL_RTRIGGER)
+			hal_callback_on_event_key_press(HAL_KEY_S);
+		else
+			hal_callback_on_event_key_release(HAL_KEY_S);
+	}
+
+	/* L → (no engine key for Auto mode, left unmapped) */
+	(void)(changed & SCE_CTRL_LTRIGGER);
+
+	/* START → System Menu (same as TRIANGLE, for traditional console players) */
+	if (changed & SCE_CTRL_START) {
+		if (buttons & SCE_CTRL_START)
+			hal_callback_on_event_key_press(HAL_KEY_ESCAPE);
+		else
+			hal_callback_on_event_key_release(HAL_KEY_ESCAPE);
+	}
+
+	/* SELECT → History (engine has no quick-save key, best-effort fallback) */
+	if (changed & SCE_CTRL_SELECT) {
+		if (buttons & SCE_CTRL_SELECT)
+			hal_callback_on_event_key_press(HAL_KEY_L);
+		else
+			hal_callback_on_event_key_release(HAL_KEY_L);
 	}
 
 	prev_buttons = buttons;
@@ -134,58 +177,86 @@ process_analog(const SceCtrlData *pad)
 
 /*
  * Process front touch screen input.
+ *
+ * Gestures:
+ *   Tap              → Confirm / Advance  (left click)
+ *   Swipe Up         → History / Backlog  (HAL_KEY_L)
+ *   Swipe Down       → Hide UI            (right click)
+ *   Swipe Right      → Skip               (HAL_KEY_S)
+ *   Swipe Left       → Page Up            (best-effort for Auto)
+ *   Two-finger Tap   → System Menu        (HAL_KEY_ESCAPE)
  */
 static void
 process_touch(void)
 {
 	SceTouchData touch;
 	int x, y;
+	const int FLICK_DISTANCE = 50;
 
 	sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touch, 1);
 
-	if (touch.reportNum > 0) {
-		/* Convert touch coordinates to screen coordinates.
-		 * Touch panel: 1920×1088 → Screen: 960×544. */
+	if (touch.reportNum >= 2 && !is_touching) {
+		/* Two-finger tap → System Menu */
+		x = ((int)touch.report[0].x + (int)touch.report[1].x) / 2;
+		y = ((int)touch.report[0].y + (int)touch.report[1].y) / 2;
+		x = x * 960 / 1920;
+		y = y * 544 / 1088;
+		hal_callback_on_event_mouse_press(HAL_MOUSE_LEFT, x, y);
+		hal_callback_on_event_mouse_release(HAL_MOUSE_LEFT, x, y);
+		hal_callback_on_event_key_press(HAL_KEY_ESCAPE);
+		hal_callback_on_event_key_release(HAL_KEY_ESCAPE);
+		/* Drain remaining touch reports to prevent false single-tap. */
+		sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touch, 1);
+		return;
+	}
+
+	if (touch.reportNum == 1) {
 		x = (int)touch.report[0].x * 960 / 1920;
 		y = (int)touch.report[0].y * 544 / 1088;
 
 		if (!is_touching) {
-			/* Touch start. */
 			touch_start_x = x;
 			touch_start_y = y;
+			touch_last_x = x;
 			touch_last_y = y;
 			is_touching = true;
 			hal_callback_on_event_mouse_press(HAL_MOUSE_LEFT, x, y);
 		} else {
-			/* Touch move. */
-			int delta_y = y - touch_last_y;
+			touch_last_x = x;
 			touch_last_y = y;
-
-			if (is_continuous_swipe_enabled) {
-				if (delta_y > 0 && delta_y < 30) {
-					hal_callback_on_event_key_press(HAL_KEY_DOWN);
-					hal_callback_on_event_key_release(HAL_KEY_DOWN);
-				}
-			}
-
 			hal_callback_on_event_mouse_move(x, y);
 		}
 	} else if (is_touching) {
-		/* Touch end. */
-		int delta_y = touch_last_y - touch_start_y;
-		const int FLICK_Y_DISTANCE = 50;
-		const int TAP_DISTANCE = 10;
+		/* Touch released — detect gesture from accumulated deltas. */
+		int dx = touch_last_x - touch_start_x;
+		int dy = touch_last_y - touch_start_y;
 
-		if (delta_y > FLICK_Y_DISTANCE) {
+		if (dy > FLICK_DISTANCE && dy > abs(dx)) {
+			/* Swipe Down → Hide UI (right click) */
 			hal_callback_on_event_touch_cancel();
-			hal_callback_on_event_swipe_down();
-		} else if (delta_y < -FLICK_Y_DISTANCE) {
+			hal_callback_on_event_mouse_press(HAL_MOUSE_RIGHT,
+				touch_start_x, touch_start_y);
+			hal_callback_on_event_mouse_release(HAL_MOUSE_RIGHT,
+				touch_start_x, touch_start_y);
+		} else if (dy < -FLICK_DISTANCE && -dy > abs(dx)) {
+			/* Swipe Up → History */
 			hal_callback_on_event_touch_cancel();
-			hal_callback_on_event_swipe_up();
+			hal_callback_on_event_key_press(HAL_KEY_L);
+			hal_callback_on_event_key_release(HAL_KEY_L);
+		} else if (dx > FLICK_DISTANCE && dx > abs(dy)) {
+			/* Swipe Right → Skip */
+			hal_callback_on_event_touch_cancel();
+			hal_callback_on_event_key_press(HAL_KEY_S);
+			hal_callback_on_event_key_release(HAL_KEY_S);
+		} else if (dx < -FLICK_DISTANCE && -dx > abs(dy)) {
+			/* Swipe Left → Page Up (best-effort, no Auto key in engine) */
+			hal_callback_on_event_touch_cancel();
+			hal_callback_on_event_key_press(HAL_KEY_PAGEUP);
+			hal_callback_on_event_key_release(HAL_KEY_PAGEUP);
 		} else {
+			/* Tap → Confirm */
 			hal_callback_on_event_mouse_release(HAL_MOUSE_LEFT,
-				touch_last_y > 0 ? touch_start_x : 0,
-				touch_last_y > 0 ? touch_start_y : 0);
+				touch_start_x, touch_start_y);
 		}
 
 		is_touching = false;
