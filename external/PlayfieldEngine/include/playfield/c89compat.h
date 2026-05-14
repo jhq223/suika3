@@ -284,6 +284,10 @@ extern "C" {
 #if defined(PF_TARGET_PCAT)
 #endif
 
+/* PS Vita */
+#if defined(PF_TARGET_PSVITA)
+#endif
+
 /* Error: No target detected. */
 #if !defined(PF_TARGET_WINDOWS) &&              \
     !defined(PF_TARGET_MACOS) &&                \
@@ -302,7 +306,8 @@ extern "C" {
     !defined(PF_TARGET_BEOS) &&                 \
     !defined(PF_TARGET_UNITY) &&                \
     !defined(PF_TARGET_PCAT) &&                 \
-    !defined(PF_TARGET_PC98)
+    !defined(PF_TARGET_PC98) &&                 \
+    !defined(PF_TARGET_PSVITA)
 #error "No target detected."
 #endif
 

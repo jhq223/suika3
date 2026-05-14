@@ -41,6 +41,7 @@ option(SUIKA_TARGET_GENERICUNIX      "Build for Generic Unknow UNIX (X11, Soft3D
 option(SUIKA_TARGET_HAIKU            "Build for Haiku OS (Soft3D)"                    OFF)
 option(SUIKA_TARGET_PC98             "Build for NEC PC-9801"                          OFF)
 option(SUIKA_TARGET_PCAT             "Build for IBM PC/AT"                            OFF)
+option(SUIKA_TARGET_PSVITA           "Build for PS Vita"                              OFF)
 
 # ---
 
@@ -233,6 +234,7 @@ if(   SUIKA_TARGET_WINDOWS
    OR SUIKA_TARGET_HAIKU
    OR SUIKA_TARGET_PC98
    OR SUIKA_TARGET_PCAT
+   OR SUIKA_TARGET_PSVITA
 )
   # A target and options are manually specified.
 else()   
@@ -452,6 +454,8 @@ if(   NOT SUIKA_ENABLE_DIST
     set(PLAYFIELD_TARGET_PC98 ON)
   elseif(SUIKA_TARGET_PCAT)
     set(PLAYFIELD_TARGET_PCAT ON)
+  elseif(SUIKA_TARGET_PSVITA)
+    set(PLAYFIELD_TARGET_PSVITA ON)
   else()
     error("No target specified or detected.")
   endif()
@@ -863,6 +867,13 @@ if(SUIKA_TARGET_PCAT)
     PF_TARGET_PCAT
     HAL_TARGET_PCAT
     NOCT_TARGET_DOS4G
+# PS Vita
+if(SUIKA_TARGET_PSVITA)
+  target_compile_definitions(suika3 PRIVATE
+    S3_TARGET_PSVITA
+    PF_TARGET_PSVITA
+    HAL_TARGET_PSVITA
+    NOCT_TARGET_PSVITA
   )
 endif()
 

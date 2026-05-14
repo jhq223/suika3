@@ -38,6 +38,7 @@ option(PLAYFIELD_TARGET_GDK_WINDOWS      "Build for GDK for Desktop"            
 option(PLAYFIELD_TARGET_GDK_XBOX_XS      "Build for GDK for Xbox Series X|S"          OFF)
 option(PLAYFIELD_TARGET_PC98             "Build for NEC PC-9801"                      OFF)
 option(PLAYFIELD_TARGET_PCAT             "Build for IBM PC/AT"                        OFF)
+option(PLAYFIELD_TARGET_PSVITA           "Build for PS Vita (vitaGL)"                 OFF)
 
 # Options
 option(PLAYFIELD_ENABLE_STATIC           "Build a static library"                     OFF)
@@ -99,6 +100,7 @@ if(   PLAYFIELD_TARGET_WINDOWS
    OR PLAYFIELD_TARGET_UWP
    OR PLAYFIELD_TARGET_PC98
    OR PLAYFIELD_TARGET_PCAT
+   OR PLAYFIELD_TARGET_PSVITA
 )
   # A target and options are manually specified.
 else()   
@@ -246,6 +248,11 @@ if(NOT PLAYFIELD_ENABLE_DIST)
   if(PLAYFIELD_TARGET_PC98 OR PLAYFIELD_TARGET_PCAT)
     set(NOCT_TARGET_DOS4G ON)
   endif()
+
+  # PS Vita
+  if(PLAYFIELD_TARGET_PSVITA)
+    set(NOCT_TARGET_PSVITA ON)
+  endif()
 endif()
 
 # ---
@@ -328,6 +335,8 @@ if(NOT PLAYFIELD_ENABLE_DIST)
     set(STRATO_TARGET_PC98 ON)
   elseif(PLAYFIELD_TARGET_PCAT)
     set(STRATO_TARGET_PCAT ON)
+  elseif(PLAYFIELD_TARGET_PSVITA)
+    set(STRATO_TARGET_PSVITA ON)
   else()
     error("No target specified or detected.")
   endif()
@@ -628,6 +637,15 @@ endif()
 if(PLAYFIELD_TARGET_PCAT)
   target_compile_definitions(playfield PUBLIC PF_TARGET_PCAT)
 endif()
+
+
+
+# PS Vita
+if(PLAYFIELD_TARGET_PSVITA)
+  target_compile_definitions(playfield PUBLIC PF_TARGET_PSVITA)
+endif()
+
+
 
 # Windows
 if(PLAYFIELD_TARGET_WINDOWS)

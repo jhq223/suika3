@@ -286,6 +286,10 @@ extern "C" {
 #if defined(HAL_TARGET_PCAT)
 #endif
 
+/* PS Vita */
+#if defined(HAL_TARGET_PSVITA)
+#endif
+
 /* Error: No target detected. */
 #if !defined(HAL_TARGET_WINDOWS) &&              \
     !defined(HAL_TARGET_MACOS) &&                \
@@ -303,8 +307,9 @@ extern "C" {
     !defined(HAL_TARGET_WASM) &&                 \
     !defined(HAL_TARGET_HAIKU) &&                \
     !defined(HAL_TARGET_UNITY) &&                \
-    !defined(HAL_TARGET_PC98) &&                 \
-    !defined(HAL_TARGET_PCAT)
+    !defined(HAL_TARGET_PC98)  &&                \
+	!defined(HAL_TARGET_PCAT)  &&                \
+	!defined(HAL_TARGET_PSVITA)
 #error "No target detected."
 #endif
 

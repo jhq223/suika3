@@ -90,6 +90,13 @@
 #endif
 
 /*
+ * PS Vita (vitaGL ≈ OpenGL ES 2.0)
+ */
+#if defined(HAL_TARGET_PSVITA)
+#include <vitaGL.h>
+#endif
+
+/*
  * Windows (OpenGL 3.2) (Unused)
  */
 #if defined(HAL_TARGET_WINDOWS)

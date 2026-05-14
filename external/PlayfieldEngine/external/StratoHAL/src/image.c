@@ -37,7 +37,7 @@
 #include <limits.h>
 #include <assert.h>
 
-#if defined(HAL_TARGET_WINDOWS)
+#if defined(HAL_TARGET_WINDOWS) || defined(HAL_TARGET_PSVITA)
 #include <malloc.h>	/* _aligned_mallo() */
 #endif
 
@@ -142,7 +142,7 @@ hal_create_image(
 		free(*img);
 		return false;
 	}
-#elif defined(HAL_TARGET_SOLARIS10)
+#elif defined(HAL_TARGET_SOLARIS10) || defined(HAL_TARGET_PSVITA)
 	pixels = memalign(64, (size_t)w * (size_t)h * sizeof(hal_pixel_t));
 	if (pixels == NULL) {
 		hal_log_out_of_memory();

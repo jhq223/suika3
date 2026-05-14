@@ -39,6 +39,7 @@ option(STRATO_TARGET_GDK_WINDOWS      "Build for GDK for Desktop"               
 option(STRATO_TARGET_GDK_XBOX_XS      "Build for GDK for Xbox Series X|S"       OFF)
 option(STRATO_TARGET_PC98             "Build for PC-9800 series"                OFF)
 option(STRATO_TARGET_PCAT             "Build for IBM PC/AT compatible"          OFF)
+option(STRATO_TARGET_PSVITA           "Build for PS Vita (vitaGL)"               OFF)
 
 # Options
 option(STRATO_ENABLE_OBJECT           "Build an object library"                 OFF)
@@ -92,6 +93,7 @@ if(   STRATO_TARGET_WINDOWS
    OR STRATO_TARGET_GDK_XBOX_XS
    OR STRATO_TARGET_PC98
    OR STRATO_TARGET_PCAT
+   OR STRATO_TARGET_PSVITA
 )
   # A target and options are manually specified.
 else()
@@ -579,6 +581,20 @@ if(STRATO_TARGET_ANDROID)
   )
 endif()
 
+# PS Vita
+if(STRATO_TARGET_PSVITA)
+  set(STRATO_SOURCES
+    src/image.c
+    src/glyph.c
+    src/wave.c
+    src/glrender.c
+    src/vitasound.c
+    src/vitamain.c
+    src/vitafile.c
+    src/vitagamepad.c
+  )
+endif()
+
 # HarmonyOS NEXT / OpenHarmony
 if(STRATO_TARGET_OPENHARMONY)
   enable_language(CXX)
@@ -899,6 +915,11 @@ endif()
 # OpenHarmony
 if(STRATO_TARGET_OPENHARMONY)
   target_compile_definitions(strato PUBLIC HAL_TARGET_OPENHARMONY)
+endif()
+
+# PS Vita
+if(STRATO_TARGET_PSVITA)
+  target_compile_definitions(strato PUBLIC HAL_TARGET_PSVITA)
 endif()
 
 # Unity
@@ -1248,6 +1269,31 @@ endif()
 # OpenHarmony
 if(STRATO_TARGET_OPENHARMONY)
   target_link_libraries(strato PUBLIC m GLESv2 OpenSLES librawfile.z.so)
+endif()
+
+# PS Vita
+if(STRATO_TARGET_PSVITA)
+  target_link_libraries(strato PUBLIC
+    vitaGL
+    mathneon
+    stdc++
+    c
+    m
+    vitashark
+    SceShaccCgExt
+    SceGxm_stub
+    SceDisplay_stub
+    SceAppMgr_stub
+    SceCommonDialog_stub
+    SceSysmodule_stub
+    SceKernelDmacMgr_stub
+    SceShaccCg_stub
+    SceCtrl_stub
+    SceTouch_stub
+    SceAudio_stub
+    SceAppUtil_stub
+    taihen_stub
+  )
 endif()
 
 # Solaris11

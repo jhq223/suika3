@@ -287,6 +287,13 @@ extern "C" {
 #endif
 #endif
 
+/* PS Vita */
+#if defined(NOCT_TARGET_PSVITA)
+#ifndef NOCT_TARGET_POSIX
+#define NOCT_TARGET_POSIX
+#endif
+#endif
+
 /* Error: No target detected. */
 #if !defined(NOCT_TARGET_WINDOWS) &&              \
     !defined(NOCT_TARGET_MACOS) &&                \
@@ -304,7 +311,8 @@ extern "C" {
     !defined(NOCT_TARGET_WASM) &&                 \
     !defined(NOCT_TARGET_BEOS) &&                 \
     !defined(NOCT_TARGET_UNITY) &&                \
-    !defined(NOCT_TARGET_DOS4G)
+    !defined(NOCT_TARGET_DOS4G) &&                \
+    !defined(NOCT_TARGET_PSVITA)
 #error "No target detected."
 #endif
 

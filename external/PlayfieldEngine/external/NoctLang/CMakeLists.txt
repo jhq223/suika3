@@ -33,6 +33,7 @@ option(NOCT_TARGET_UNITY        "Build for Unity"                  OFF)
 option(NOCT_TARGET_OPENHARMONY  "Build for OpenHarmony"            OFF)
 option(NOCT_TARGET_MACOS7       "Build for MacOS 7"                OFF)
 option(NOCT_TARGET_DOS4G        "Build for DOS4G"                  OFF)
+option(NOCT_TARGET_PSVITA       "Build for PS Vita"                OFF)
 
 # ---
 
@@ -341,6 +342,14 @@ endif()
 # DOS4G Target
 if(NOCT_TARGET_DOS4G)
   list(APPEND NOCT_PUBLIC_CPPFLAGS NOCT_TARGET_DOS4G NOCT_MEMORY_SMALL)
+endif()
+
+# NOCT_TARGET_PSVITA
+if(NOCT_TARGET_PSVITA)
+  target_compile_definitions(noct PUBLIC NOCT_TARGET_PSVITA)
+  if(NOCT_ENABLE_API)
+    target_compile_definitions(noctapi PUBLIC NOCT_TARGET_PSVITA)
+  endif()
 endif()
 
 # _CRT_SECURE_NO_WARNINGS
