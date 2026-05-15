@@ -1656,7 +1656,8 @@ hal_bootstrap(
     defined(HAL_TARGET_MACOS)		||	\
     defined(HAL_TARGET_IOS)             ||      \
     defined(HAL_TARGET_PC98)            ||      \
-    defined(HAL_TARGET_PCAT)
+    defined(HAL_TARGET_PCAT)          ||      \
+	defined(HAL_TARGET_PSVITA)          
 #define HAL_DEFINE_MAIN()				\
 	int main(int argc, char *argv[])		\
 	{						\

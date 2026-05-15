@@ -28,7 +28,7 @@
  * 3. This notice may not be removed or altered from any source distribution.
  */
 
-#include "stratohal/platform.h"
+#include <strato/strato.h>
 
 #include <psp2/audioout.h>
 #include <psp2/kernel/threadmgr.h>
@@ -38,6 +38,10 @@
 #include <string.h>
 
 #define SAMPLING_RATE	(48000)
+/* TODO: Ogg Vorbis wave data is 44100 Hz but output is 48000 Hz.
+ * This causes ~8.8% faster playback and higher pitch.
+ * Proper fix: either resample or switch output to 44100 Hz
+ * (grain=1024, BUF_FRAMES must be multiple of 1024). */
 #define BUF_FRAMES	(960)	/* multiple of grain=96 for 48000Hz */
 #define FRAME_SIZE	(4)
 #define TMP_SAMPLES	(480)	/* multiple of grain=96 */
@@ -191,7 +195,7 @@ init_sound(void)
 	sceClibPrintf("[SND] init_sound() ENTER\n");
 
 	sound_mutex = sceKernelCreateMutex("suika3_sound_mutex",
-					 SCE_KERNEL_MUTEX_ATTR_RECURSIVE, 1, NULL);
+					 SCE_KERNEL_MUTEX_ATTR_RECURSIVE, 0, NULL);
 	if (sound_mutex < 0) {
 		sceClibPrintf("[SND] sceKernelCreateMutex() FAILED: 0x%08X\n", sound_mutex);
 		return false;

@@ -28,7 +28,8 @@
  * 3. This notice may not be removed or altered from any source distribution.
  */
 
-#include "stratohal/platform.h"
+#include <strato/strato.h>
+#include "callback.h"
 
 #include <psp2/ctrl.h>
 #include <psp2/touch.h>
@@ -113,26 +114,26 @@ process_buttons(uint32_t buttons)
 				continue;
 
 			if (buttons & all_buttons[i])
-				hal_callback_on_event_key_press(key);
+				hal_callback.on_key_press(key);
 			else
-				hal_callback_on_event_key_release(key);
+				hal_callback.on_key_release(key);
 		}
 	}
 
 	/* SQUARE → History / Backlog */
 	if (changed & SCE_CTRL_SQUARE) {
 		if (buttons & SCE_CTRL_SQUARE)
-			hal_callback_on_event_key_press(HAL_KEY_L);
+			hal_callback.on_key_press(HAL_KEY_L);
 		else
-			hal_callback_on_event_key_release(HAL_KEY_L);
+			hal_callback.on_key_release(HAL_KEY_L);
 	}
 
 	/* R → Skip toggle */
 	if (changed & SCE_CTRL_RTRIGGER) {
 		if (buttons & SCE_CTRL_RTRIGGER)
-			hal_callback_on_event_key_press(HAL_KEY_S);
+			hal_callback.on_key_press(HAL_KEY_S);
 		else
-			hal_callback_on_event_key_release(HAL_KEY_S);
+			hal_callback.on_key_release(HAL_KEY_S);
 	}
 
 	/* L → (no engine key for Auto mode, left unmapped) */
@@ -141,17 +142,17 @@ process_buttons(uint32_t buttons)
 	/* START → System Menu (same as TRIANGLE, for traditional console players) */
 	if (changed & SCE_CTRL_START) {
 		if (buttons & SCE_CTRL_START)
-			hal_callback_on_event_key_press(HAL_KEY_ESCAPE);
+			hal_callback.on_key_press(HAL_KEY_ESCAPE);
 		else
-			hal_callback_on_event_key_release(HAL_KEY_ESCAPE);
+			hal_callback.on_key_release(HAL_KEY_ESCAPE);
 	}
 
 	/* SELECT → History (engine has no quick-save key, best-effort fallback) */
 	if (changed & SCE_CTRL_SELECT) {
 		if (buttons & SCE_CTRL_SELECT)
-			hal_callback_on_event_key_press(HAL_KEY_L);
+			hal_callback.on_key_press(HAL_KEY_L);
 		else
-			hal_callback_on_event_key_release(HAL_KEY_L);
+			hal_callback.on_key_release(HAL_KEY_L);
 	}
 
 	prev_buttons = buttons;
@@ -165,15 +166,15 @@ process_analog(const SceCtrlData *pad)
 {
 	/* Left stick: range 0-255, center at 128.
 	 * Map to signed 16-bit range for HAL. */
-	hal_callback_on_event_analog_input(HAL_ANALOG_X1,
+	hal_callback.on_analog_input(HAL_ANALOG_X1,
 		(int)(pad->lx - 128) * 256);
-	hal_callback_on_event_analog_input(HAL_ANALOG_Y1,
+	hal_callback.on_analog_input(HAL_ANALOG_Y1,
 		(int)(pad->ly - 128) * 256);
 
 	/* Right stick. */
-	hal_callback_on_event_analog_input(HAL_ANALOG_X2,
+	hal_callback.on_analog_input(HAL_ANALOG_X2,
 		(int)(pad->rx - 128) * 256);
-	hal_callback_on_event_analog_input(HAL_ANALOG_Y2,
+	hal_callback.on_analog_input(HAL_ANALOG_Y2,
 		(int)(pad->ry - 128) * 256);
 }
 
@@ -203,10 +204,10 @@ process_touch(void)
 		y = ((int)touch.report[0].y + (int)touch.report[1].y) / 2;
 		x = x * 960 / 1920;
 		y = y * 544 / 1088;
-		hal_callback_on_event_mouse_press(HAL_MOUSE_LEFT, x, y);
-		hal_callback_on_event_mouse_release(HAL_MOUSE_LEFT, x, y);
-		hal_callback_on_event_key_press(HAL_KEY_ESCAPE);
-		hal_callback_on_event_key_release(HAL_KEY_ESCAPE);
+		hal_callback.on_mouse_press(HAL_MOUSE_LEFT, x, y);
+		hal_callback.on_mouse_release(HAL_MOUSE_LEFT, x, y);
+		hal_callback.on_key_press(HAL_KEY_ESCAPE);
+		hal_callback.on_key_release(HAL_KEY_ESCAPE);
 		/* Drain remaining touch reports to prevent false single-tap. */
 		sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touch, 1);
 		return;
@@ -222,11 +223,11 @@ process_touch(void)
 			touch_last_x = x;
 			touch_last_y = y;
 			is_touching = true;
-			hal_callback_on_event_mouse_press(HAL_MOUSE_LEFT, x, y);
+			hal_callback.on_mouse_press(HAL_MOUSE_LEFT, x, y);
 		} else {
 			touch_last_x = x;
 			touch_last_y = y;
-			hal_callback_on_event_mouse_move(x, y);
+			hal_callback.on_mouse_move(x, y);
 		}
 	} else if (is_touching) {
 		/* Touch released — detect gesture from accumulated deltas. */
@@ -235,29 +236,29 @@ process_touch(void)
 
 		if (dy > FLICK_DISTANCE && dy > abs(dx)) {
 			/* Swipe Down → Hide UI (right click) */
-			hal_callback_on_event_touch_cancel();
-			hal_callback_on_event_mouse_press(HAL_MOUSE_RIGHT,
+			hal_callback.on_touch_cancel();
+			hal_callback.on_mouse_press(HAL_MOUSE_RIGHT,
 				touch_start_x, touch_start_y);
-			hal_callback_on_event_mouse_release(HAL_MOUSE_RIGHT,
+			hal_callback.on_mouse_release(HAL_MOUSE_RIGHT,
 				touch_start_x, touch_start_y);
 		} else if (dy < -FLICK_DISTANCE && -dy > abs(dx)) {
 			/* Swipe Up → History */
-			hal_callback_on_event_touch_cancel();
-			hal_callback_on_event_key_press(HAL_KEY_L);
-			hal_callback_on_event_key_release(HAL_KEY_L);
+			hal_callback.on_touch_cancel();
+			hal_callback.on_key_press(HAL_KEY_L);
+			hal_callback.on_key_release(HAL_KEY_L);
 		} else if (dx > FLICK_DISTANCE && dx > abs(dy)) {
 			/* Swipe Right → Skip */
-			hal_callback_on_event_touch_cancel();
-			hal_callback_on_event_key_press(HAL_KEY_S);
-			hal_callback_on_event_key_release(HAL_KEY_S);
+			hal_callback.on_touch_cancel();
+			hal_callback.on_key_press(HAL_KEY_S);
+			hal_callback.on_key_release(HAL_KEY_S);
 		} else if (dx < -FLICK_DISTANCE && -dx > abs(dy)) {
 			/* Swipe Left → Page Up (best-effort, no Auto key in engine) */
-			hal_callback_on_event_touch_cancel();
-			hal_callback_on_event_key_press(HAL_KEY_PAGEUP);
-			hal_callback_on_event_key_release(HAL_KEY_PAGEUP);
+			hal_callback.on_touch_cancel();
+			hal_callback.on_key_press(HAL_KEY_PAGEUP);
+			hal_callback.on_key_release(HAL_KEY_PAGEUP);
 		} else {
 			/* Tap → Confirm */
-			hal_callback_on_event_mouse_release(HAL_MOUSE_LEFT,
+			hal_callback.on_mouse_release(HAL_MOUSE_LEFT,
 				touch_start_x, touch_start_y);
 		}
 

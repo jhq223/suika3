@@ -31,8 +31,12 @@
 #ifndef STRATOHAL_VITAMAIN_H
 #define STRATOHAL_VITAMAIN_H
 
-#include "stratohal/c89compat.h"
+#include <strato/c89compat.h>
 #include <stdio.h>
+
+/* Path resolution */
+char *hal_make_real_path(const char *fname);
+char *hal_make_valid_path(const char *dir, const char *fname);
 
 struct hal_rfile {
 	FILE *fp;

@@ -29,7 +29,8 @@
  */
 
 /* Base */
-#include "stratohal/platform.h"
+#include <strato/strato.h>
+#include "callback.h"
 
 /* HAL */
 #include "vitamain.h"
@@ -72,6 +73,9 @@ static int screen_height;
 
 /* Base path for resource resolution (set by suika3_run). */
 const char *vita_base_path;
+
+/* Callback struct. */
+struct hal_callback hal_callback;
 
 /*
  * Path buffer size.
@@ -123,7 +127,7 @@ suika3_run(const char *bp, const char *title_id)
 	screen_width = SCREEN_WIDTH;
 	screen_height = SCREEN_HEIGHT;
 
-	if (!hal_callback_on_event_boot(&window_title, &screen_width, &screen_height)) {
+	if (!hal_bootstrap_ptr(&window_title, &screen_width, &screen_height, &hal_callback)) {
 		hal_log_error("Initialization failed.");
 		goto fail_after_file;
 	}
@@ -140,7 +144,7 @@ suika3_run(const char *bp, const char *title_id)
 
 	init_vitagamepad();
 
-	if (!hal_callback_on_event_start()) {
+	if (!hal_callback.on_start()) {
 		hal_log_error("Failed to initialize event loop.");
 		goto fail_after_sound;
 	}
@@ -149,12 +153,13 @@ suika3_run(const char *bp, const char *title_id)
 	for (;;) {
 		update_vitagamepad();
 		opengl_start_rendering();
-		if (!hal_callback_on_event_frame())
+		if (!hal_callback.on_update())
 			break;
+		hal_callback.on_render();
 		vglSwapBuffers(GL_FALSE);
 	}
 
-	hal_callback_on_event_stop();
+	hal_callback.on_stop();
 	cleanup_sound();
 	cleanup_opengl();
 	cleanup_file();
@@ -166,7 +171,7 @@ fail_after_gl:
 	cleanup_opengl();
 fail_after_file:
 	if (started)
-		hal_callback_on_event_stop();
+		hal_callback.on_stop();
 	cleanup_file();
 fail:
 	return false;

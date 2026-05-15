@@ -339,6 +339,16 @@ else()
     set(SUIKA_ENABLE_AOTC               ON)
     set(SUIKA_ENABLE_INSTALL            ON)
 
+  elseif(CMAKE_C_COMPILER MATCHES "arm-vita-eabi")
+    # PS Vita is detected (Vita SDK toolchain).
+    set(SUIKA_TARGET_PSVITA             ON)
+    set(SUIKA_ENABLE_JIT                ON)
+    set(SUIKA_ENABLE_I18N               OFF)
+    set(SUIKA_ENABLE_PACK               OFF)  
+    set(SUIKA_ENABLE_BCC                OFF) 
+    set(SUIKA_ENABLE_AOTC               OFF)
+    set(SUIKA_ENABLE_STATIC             ON)
+
   else()
     # Consider the system is UNIX with X11.
     set(SUIKA_TARGET_GENERICUNIX        ON)
@@ -357,6 +367,7 @@ else()
   #  - HarmonyOS NEXT
   #  - Wasm (Emscripten)
   #  - Unity
+  #  - PS Vita (arm-vita-eabi) — added auto-detection above
 endif()
 
 # ---
