@@ -817,6 +817,7 @@ opengl_start_rendering(void)
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 #endif
+	is_after_reinit = false;
 }
 
 /*
@@ -826,7 +827,6 @@ void
 opengl_end_rendering(void)
 {
 	glFlush();
-	is_after_reinit = false;
 }
 
 /*
