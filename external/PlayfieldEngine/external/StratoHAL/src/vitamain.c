@@ -257,6 +257,9 @@ extern void update_vitagamepad(void);
         dbg_write("[suika3] Step 7: start callback...");
         if (!hal_callback_on_event_start()) {
                 dbg_write("[suika3] FAIL at start callback");
+                cleanup_sound();
+                cleanup_opengl();
+                cleanup_file();
                 if (dbg) fclose(dbg);
                 return false;
         }
@@ -283,6 +286,12 @@ extern void update_vitagamepad(void);
 
                   if (dbg) { fprintf(dbg, "E%d\n", fc); fflush(dbg); }
           }
+
+          dbg_write("[suika3] exiting main loop");
+          hal_callback_on_event_stop();
+          cleanup_sound();
+          cleanup_opengl();
+          cleanup_file();
           if (dbg) fclose(dbg);
   }
 

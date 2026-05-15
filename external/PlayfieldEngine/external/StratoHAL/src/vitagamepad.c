@@ -32,6 +32,7 @@
 
 #include <psp2/ctrl.h>
 #include <psp2/touch.h>
+#include <stdlib.h>
 
 /*
  * Previous button state for edge detection.
