@@ -1280,6 +1280,7 @@ if(STRATO_TARGET_PSVITA)
     c
     m
     vitashark
+    SceLibKernel_stub
     SceShaccCgExt
     SceGxm_stub
     SceDisplay_stub

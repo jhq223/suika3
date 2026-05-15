@@ -39,6 +39,7 @@
 #include <vitaGL.h>
 #include <psp2/apputil.h>
 #include <psp2/kernel/threadmgr.h>
+#include <psp2/kernel/clib.h>
 
 /* Standard C */
 #include <stdarg.h>
@@ -93,207 +94,83 @@ extern void cleanup_sound(void);
 extern void init_vitagamepad(void);
 extern void update_vitagamepad(void);
 
-// /*
-//  * Engine entry point.
-//  */
-// bool
-// suika3_run(const char *bp)
-// {
-// 	vita_base_path = bp;
+bool
+suika3_run(const char *bp, const char *title_id)
+{
+	bool started;
 
-// 	/* Init vitaGL with 8MB of VRAM for streaming textures. */
-// 	vglInit(0x800000);
+	vita_base_path = bp;
+	started = false;
 
-// 	/* Set window title for boot callback. */
-// 	window_title = "suika3";
+	/* Build savedata path from runtime title_id. */
+	snprintf(vita_savedata_dir, PATH_SIZE, "ux0:user/00/savedata/%s",
+		 title_id != NULL ? title_id : "SUIKA0001");
 
-// 	/* Init the file HAL. */
-// 	if (!init_file()) {
-// 		hal_log_error("Failed to initialize file HAL.");
-// 		return false;
-// 	}
+	/* Create the save root early. */
+	mkdir("ux0:user/00/savedata", 0755);
+	mkdir(vita_savedata_dir, 0755);
 
-// 	/* Do a boot callback to acquire screen configuration. */
-// 	screen_width = SCREEN_WIDTH;
-// 	screen_height = SCREEN_HEIGHT;
-// 	if (!hal_callback_on_event_boot(&window_title, &screen_width, &screen_height)) {
-// 		hal_log_error("Initialization failed.");
-// 		return false;
-// 	}
+	vglInit(0x800000);
+	vglWaitVblankStart(GL_TRUE);
 
-// 	/* Init the graphics HAL. */
-// 	if (!init_opengl(screen_width, screen_height)) {
-// 		hal_log_error("Failed to initialize OpenGL.");
-// 		return false;
-// 	}
+	window_title = "suika3";
 
-// 	/* Init the sound HAL. */
-// 	if (!init_sound()) {
-// 		hal_log_error("Failed to initialize sound.");
-// 		return false;
-// 	}
+	if (!init_file()) {
+		hal_log_error("Failed to initialize file HAL.");
+		goto fail;
+	}
 
-// 	/* Init the gamepad HAL. */
-// 	init_vitagamepad();
+	screen_width = SCREEN_WIDTH;
+	screen_height = SCREEN_HEIGHT;
 
-// 	/* Do a start callback. */
-// 	if (!hal_callback_on_event_start()) {
-// 		hal_log_error("Failed to initialize event loop.");
-// 		return false;
-// 	}
+	if (!hal_callback_on_event_boot(&window_title, &screen_width, &screen_height)) {
+		hal_log_error("Initialization failed.");
+		goto fail_after_file;
+	}
 
-// 	/* Main loop. */
-// 	for (;;) {
-// 		/* Update input. */
-// 		update_vitagamepad();
+	if (!init_opengl(screen_width, screen_height)) {
+		hal_log_error("Failed to initialize OpenGL.");
+		goto fail_after_file;
+	}
 
-// 		/* Start rendering. */
-// 		opengl_start_rendering();
+	if (!init_sound()) {
+		hal_log_error("Failed to initialize sound.");
+		goto fail_after_gl;
+	}
 
-// 		/* Run a frame. */
-// 		if (!hal_callback_on_event_frame())
-// 			break;
+	init_vitagamepad();
 
-// 		/* Finish rendering. */
-// 		opengl_end_rendering();
-// 		vglSwapBuffers(GL_FALSE);
-// 	}
+	if (!hal_callback_on_event_start()) {
+		hal_log_error("Failed to initialize event loop.");
+		goto fail_after_sound;
+	}
+	started = true;
 
-// 	/* Cleanup. */
-// 	hal_callback_on_event_stop();
-// 	cleanup_opengl();
-// 	cleanup_sound();
-// 	cleanup_file();
-// 	/* vitaGL 无需显式清理 */
+	for (;;) {
+		update_vitagamepad();
+		opengl_start_rendering();
+		if (!hal_callback_on_event_frame())
+			break;
+		vglSwapBuffers(GL_FALSE);
+	}
 
-// 	return true;
-// }
-  static FILE *dbg = NULL;
+	hal_callback_on_event_stop();
+	cleanup_sound();
+	cleanup_opengl();
+	cleanup_file();
+	return true;
 
-  static void dbg_write(const char *msg)
-  {
-        if (dbg) {
-                fprintf(dbg, "%s\n", msg);
-                fflush(dbg);
-        }
-  }
-
-  bool
-  suika3_run(const char *bp, const char *title_id)
-  {
-        char test_path[PATH_SIZE];
-
-        vita_base_path = bp;
-
-        /* Build savedata path from runtime title_id. */
-        snprintf(vita_savedata_dir, PATH_SIZE, "ux0:user/00/savedata/%s",
-                 title_id ? title_id : "SUIKA0001");
-
-        /* Make sure save data directory exists for debug log. */
-        mkdir(vita_savedata_dir, 0755);
-
-        snprintf(test_path, PATH_SIZE, "%s/debug.log", vita_savedata_dir);
-        dbg = fopen(test_path, "w");
-
-        dbg_write("[suika3] Step 1: vglInit...");
-        vglInit(0x800000);
-		vglWaitVblankStart(GL_TRUE);
-        dbg_write("[suika3] Step 1: vglInit done");
-
-        window_title = "suika3";
-
-        /* Test path resolution */
-        char *real = hal_make_real_path("start.novel");
-        snprintf(test_path, PATH_SIZE, "%s", real);
-        if (dbg) { fprintf(dbg, "[suika3] path test: start.novel -> %s\n", test_path); fflush(dbg); }
-        free(real);
-
-        dbg_write("[suika3] Step 2: init_file...");
-        if (!init_file()) {
-                dbg_write("[suika3] FAIL at init_file");
-                if (dbg) fclose(dbg);
-                return false;
-        }
-        dbg_write("[suika3] Step 2: init_file done");
-
-        /* Check if start.novel exists */
-        if (dbg) {
-                fprintf(dbg, "[suika3] check: start.novel exists = %d\n",
-                        hal_check_file_exist("start.novel"));
-                fflush(dbg);
-        }
-
-        screen_width = SCREEN_WIDTH;
-        screen_height = SCREEN_HEIGHT;
-
-        dbg_write("[suika3] Step 3: boot callback...");
-        if (!hal_callback_on_event_boot(&window_title, &screen_width, &screen_height)) {
-                dbg_write("[suika3] FAIL at boot callback");
-                if (dbg) fclose(dbg);
-                return false;
-        }
-        dbg_write("[suika3] Step 3: boot callback done");
-
-        dbg_write("[suika3] Step 4: init_opengl...");
-        if (!init_opengl(screen_width, screen_height)) {
-                dbg_write("[suika3] FAIL at init_opengl");
-                if (dbg) fclose(dbg);
-                return false;
-        }
-        dbg_write("[suika3] Step 4: init_opengl done");
-
-        dbg_write("[suika3] Step 5: init_sound...");
-        if (!init_sound()) {
-                dbg_write("[suika3] FAIL at init_sound");
-                if (dbg) fclose(dbg);
-                return false;
-        }
-        dbg_write("[suika3] Step 5: init_sound done");
-
-        dbg_write("[suika3] Step 6: init_vitagamepad...");
-        init_vitagamepad();
-        dbg_write("[suika3] Step 6: init_vitagamepad done");
-
-        dbg_write("[suika3] Step 7: start callback...");
-        if (!hal_callback_on_event_start()) {
-                dbg_write("[suika3] FAIL at start callback");
-                cleanup_sound();
-                cleanup_opengl();
-                cleanup_file();
-                if (dbg) fclose(dbg);
-                return false;
-        }
-        dbg_write("[suika3] Step 7: start callback done");
-
-        dbg_write("[suika3] Step 8: entering main loop");
-          int fc = 0;
-          for (;;) {
-                  fc++;
-                  if (dbg) { fprintf(dbg, "A%d", fc); fflush(dbg); }
-                  update_vitagamepad();
-
-                  if (dbg) { fprintf(dbg, "B%d", fc); fflush(dbg); }
-                  opengl_start_rendering();
-
-                  if (dbg) { fprintf(dbg, "C%d", fc); fflush(dbg); }
-                  if (!hal_callback_on_event_frame()) {
-                      if (dbg) { fprintf(dbg, "X%d", fc); fflush(dbg); }
-                      break;
-                  }
-
-                  if (dbg) { fprintf(dbg, "D%d", fc); fflush(dbg); }
-                  vglSwapBuffers(GL_FALSE);
-
-                  if (dbg) { fprintf(dbg, "E%d\n", fc); fflush(dbg); }
-          }
-
-          dbg_write("[suika3] exiting main loop");
-          hal_callback_on_event_stop();
-          cleanup_sound();
-          cleanup_opengl();
-          cleanup_file();
-          if (dbg) fclose(dbg);
-  }
+fail_after_sound:
+	cleanup_sound();
+fail_after_gl:
+	cleanup_opengl();
+fail_after_file:
+	if (started)
+		hal_callback_on_event_stop();
+	cleanup_file();
+fail:
+	return false;
+}
 
 /*
  * HAL
@@ -329,45 +206,21 @@ hal_log_warn(
 	return true;
 }
 
- bool
-  hal_log_error(
-        const char *s,
-        ...)
-  {
-        char buf[LOG_BUF_SIZE];
-        va_list ap;
+bool
+hal_log_error(
+	const char *s,
+	...)
+{
+	char buf[LOG_BUF_SIZE];
+	va_list ap;
 
-        va_start(ap, s);
-        vsnprintf(buf, sizeof(buf), s, ap);
-        printf("[ERROR] %s\n", buf);
-        va_end(ap);
+	va_start(ap, s);
+	vsnprintf(buf, sizeof(buf), s, ap);
+	printf("[ERROR] %s\n", buf);
+	va_end(ap);
 
-        /* Also write to debug log */
-        char err_path[PATH_SIZE];
-        snprintf(err_path, PATH_SIZE, "%s/debug.log", vita_savedata_dir);
-        FILE *d = fopen(err_path, "a");
-        if (d) {
-                fprintf(d, "[ERROR] %s\n", buf);
-                fclose(d);
-        }
-
-        return true;
-  }
-
-// bool
-// hal_log_error(
-// 	const char *s,
-// 	...)
-// {
-// 	char buf[LOG_BUF_SIZE];
-// 	va_list ap;
-
-// 	va_start(ap, s);
-// 	vsnprintf(buf, sizeof(buf), s, ap);
-// 	printf("[ERROR] %s\n", buf);
-// 	va_end(ap);
-// 	return true;
-// }
+	return true;
+}
 
 bool
 hal_log_out_of_memory(void)
