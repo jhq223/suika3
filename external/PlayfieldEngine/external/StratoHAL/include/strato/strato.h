@@ -1656,8 +1656,7 @@ hal_bootstrap(
     defined(HAL_TARGET_MACOS)		||	\
     defined(HAL_TARGET_IOS)             ||      \
     defined(HAL_TARGET_PC98)            ||      \
-    defined(HAL_TARGET_PCAT)          ||      \
-	defined(HAL_TARGET_PSVITA)          
+    defined(HAL_TARGET_PCAT)          
 #define HAL_DEFINE_MAIN()				\
 	int main(int argc, char *argv[])		\
 	{						\
@@ -1794,7 +1793,10 @@ int WINAPI WinMain(							\
 	}
 #endif
 
-#if defined(HAL_TARGET_UNITY) && !defined(HAL_USE_DLL)
+#if defined(HAL_TARGET_PSVITA)
+#define HAL_DEFINE_MAIN()
+#define HAL_DEFINE_MAIN_CHAIN(chain_ptr, chain)
+#elif defined(HAL_TARGET_UNITY) && !defined(HAL_USE_DLL)
 #define HAL_DEFINE_MAIN()						\
 	static void so_init(void)					\
 	{								\

@@ -98,6 +98,13 @@ extern void cleanup_sound(void);
 extern void init_vitagamepad(void);
 extern void update_vitagamepad(void);
 
+/*
+ * Playfield Engine init hook — normally set by PF_DEFINE_MAIN(),
+ * but Vita uses a custom entrypoint (suika3_run).
+ */
+extern bool (*pf_init_hook_ptr)(int width, int height);
+extern bool pf_init_hook(int width, int height);
+
 bool
 suika3_run(const char *bp, const char *title_id)
 {
@@ -127,7 +134,7 @@ suika3_run(const char *bp, const char *title_id)
 	screen_width = SCREEN_WIDTH;
 	screen_height = SCREEN_HEIGHT;
 
-	if (!hal_bootstrap_ptr(&window_title, &screen_width, &screen_height, &hal_callback)) {
+	if (!hal_bootstrap(&window_title, &screen_width, &screen_height, &hal_callback)) {
 		hal_log_error("Initialization failed.");
 		goto fail_after_file;
 	}
@@ -143,6 +150,11 @@ suika3_run(const char *bp, const char *title_id)
 	}
 
 	init_vitagamepad();
+
+	/* Chain the init hook so pf_init_hook_ptr() is called between
+	 * setup() and start() — required because Vita uses a custom
+	 * entrypoint (suika3_run) instead of PF_DEFINE_MAIN(). */
+	pf_init_hook_ptr = pf_init_hook;
 
 	if (!hal_callback.on_start()) {
 		hal_log_error("Failed to initialize event loop.");

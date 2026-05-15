@@ -140,7 +140,7 @@ audio_thread_main(SceSize args, void *argp)
 
 		if (!has_active_wave) {
 			unlock_sound();
-			sceKernelDelayThread(1000);
+			sceKernelDelayThread(10 * 1000);
 			continue;
 		}
 
@@ -227,7 +227,7 @@ init_sound(void)
 	sceClibPrintf("[SND] Creating audio thread...\n");
 	audio_thread = sceKernelCreateThread("suika3_audio",
 					     audio_thread_main,
-					     0x10000100 - 10,
+					     0x10000100 + 10,
 					     0x4000,
 					     0,
 					     0,
