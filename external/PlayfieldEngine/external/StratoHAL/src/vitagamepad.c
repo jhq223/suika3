@@ -56,6 +56,7 @@ void
 init_vitagamepad(void)
 {
 	sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG_WIDE);
+	sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
 	prev_buttons = 0;
 	is_touching = false;
 	is_continuous_swipe_enabled = false;
@@ -69,8 +70,8 @@ static int
 map_button_to_key(uint32_t button)
 {
 	switch (button) {
-	case SCE_CTRL_CROSS:		return HAL_KEY_GAMEPAD_A;
-	case SCE_CTRL_CIRCLE:		return HAL_KEY_GAMEPAD_B;
+	case SCE_CTRL_CROSS:		return HAL_KEY_GAMEPAD_B;
+	case SCE_CTRL_CIRCLE:		return HAL_KEY_GAMEPAD_A;
 	case SCE_CTRL_TRIANGLE:		return HAL_KEY_GAMEPAD_X;	/* system menu */
 	case SCE_CTRL_UP:		return HAL_KEY_GAMEPAD_UP;
 	case SCE_CTRL_DOWN:		return HAL_KEY_GAMEPAD_DOWN;
@@ -84,14 +85,14 @@ map_button_to_key(uint32_t button)
  * Process button state changes.
  *
  * Mapping (Japanese VN convention):
- *   CROSS     → Confirm / Advance       (GAMEPAD_A → left click)
- *   CIRCLE    → Cancel / Hide UI        (GAMEPAD_B → right click)
+ *   CIRCLE    → Confirm / Advance       (GAMEPAD_A → left click)
+ *   CROSS     → Cancel / Hide UI        (GAMEPAD_B → right click)
  *   TRIANGLE  → System Menu             (GAMEPAD_X → Escape)
  *   SQUARE    → History / Backlog       (HAL_KEY_L)
  *   L         → (unused — engine has no Auto-mode key)
  *   R         → Skip toggle             (HAL_KEY_S)
  *   START     → System Menu             (HAL_KEY_ESCAPE)
- *   SELECT    → Quick Save placeholder  (HAL_KEY_L — engine has no quick-save key)
+ *   SELECT    → History (fallback)       (HAL_KEY_L)
  */
 static void
 process_buttons(uint32_t buttons)
