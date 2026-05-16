@@ -104,7 +104,6 @@ extern void update_vitagamepad(void);
  */
 extern bool (*pf_init_hook_ptr)(int width, int height);
 extern bool pf_init_hook(int width, int height);
-
 bool
 suika3_run(const char *bp, const char *title_id)
 {
@@ -121,7 +120,12 @@ suika3_run(const char *bp, const char *title_id)
 	mkdir("ux0:user/00/savedata", 0755);
 	mkdir(vita_savedata_dir, 0755);
 
-	vglInit(0x800000);
+	vglInitWithCustomThreshold(0x800000, SCREEN_WIDTH, SCREEN_HEIGHT,
+	    0x4000000,   /* ram_threshold: 64MB left for newlib heap */
+	    0,           /* cdram_threshold: all CDRAM to vitaGL */
+	    0,           /* phycont_threshold: all PHYCONT to vitaGL */
+	    0,           /* cdlg_threshold: use ~9.2MB CDIALOG budget */
+	    SCE_GXM_MULTISAMPLE_4X);
 	vglWaitVblankStart(GL_TRUE);
 
 	window_title = "suika3";
