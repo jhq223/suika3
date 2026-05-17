@@ -37,14 +37,10 @@
 #include <math.h>
 #include <string.h>
 
-#define SAMPLING_RATE	(48000)
-/* TODO: Ogg Vorbis wave data is 44100 Hz but output is 48000 Hz.
- * This causes ~8.8% faster playback and higher pitch.
- * Proper fix: either resample or switch output to 44100 Hz
- * (grain=1024, BUF_FRAMES must be multiple of 1024). */
-#define BUF_FRAMES	(960)	/* multiple of grain=96 for 48000Hz */
+#define SAMPLING_RATE	(44100)
+#define BUF_FRAMES	(2048)	/* multiple of grain=1024 for 44100Hz */
 #define FRAME_SIZE	(4)
-#define TMP_SAMPLES	(480)	/* multiple of grain=96 */
+#define TMP_SAMPLES	(1024)	/* multiple of grain=1024 */
 
 static SceUID audio_thread = -1;
 static SceUID sound_mutex = -1;
@@ -202,7 +198,7 @@ init_sound(void)
 	}
 	sceClibPrintf("[SND] Mutex created OK (id=0x%08X).\n", sound_mutex);
 
-	audio_port = sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN,
+	audio_port = sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_BGM,
 					 BUF_FRAMES,
 					 SAMPLING_RATE,
 					 SCE_AUDIO_OUT_MODE_STEREO);

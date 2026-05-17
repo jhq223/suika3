@@ -1793,10 +1793,8 @@ int WINAPI WinMain(							\
 	}
 #endif
 
-#if defined(HAL_TARGET_PSVITA)
-#define HAL_DEFINE_MAIN()
-#define HAL_DEFINE_MAIN_CHAIN(chain_ptr, chain)
-#elif defined(HAL_TARGET_UNITY) && !defined(HAL_USE_DLL)
+
+#if defined(HAL_TARGET_UNITY) || defined(HAL_TARGET_PSVITA) && !defined(HAL_USE_DLL)
 #define HAL_DEFINE_MAIN()						\
 	static void so_init(void)					\
 	{								\

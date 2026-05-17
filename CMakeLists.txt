@@ -878,6 +878,9 @@ if(SUIKA_TARGET_PCAT)
     PF_TARGET_PCAT
     HAL_TARGET_PCAT
     NOCT_TARGET_DOS4G
+  )
+endif()
+
 # PS Vita
 if(SUIKA_TARGET_PSVITA)
   target_compile_definitions(suika3 PRIVATE
