@@ -81,10 +81,9 @@ struct hal_callback hal_callback;
  * Path buffer size.
  */
 #define PATH_SIZE	(1024)
-
 /*
  * PS Vita save data path (built at runtime from title_id parameter).
- * Commercial games use ux0:user/00/savedata/<TITLE_ID>/
+ * Homebrew saves go under ux0:/data/<TITLE_ID>/
  */
 static char vita_savedata_dir[PATH_SIZE];
 
@@ -108,17 +107,20 @@ bool
 suika3_run(const char *bp, const char *title_id)
 {
 	bool started;
+	char save_subdir[PATH_SIZE];
 
 	vita_base_path = bp;
 	started = false;
 
 	/* Build savedata path from runtime title_id. */
-	snprintf(vita_savedata_dir, PATH_SIZE, "ux0:user/00/savedata/%s",
+	snprintf(vita_savedata_dir, PATH_SIZE, "ux0:/data/%s",
 		 title_id != NULL ? title_id : "SUIKA0001");
 
-	/* Create the save root early. */
-	mkdir("ux0:user/00/savedata", 0755);
+	/* Create the save root and "save" subdirectory. */
+	mkdir("ux0:/data", 0755);
 	mkdir(vita_savedata_dir, 0755);
+	snprintf(save_subdir, PATH_SIZE, "%s/save", vita_savedata_dir);
+	mkdir(save_subdir, 0755);
 
 	vglInitWithCustomThreshold(0x800000, SCREEN_WIDTH, SCREEN_HEIGHT,
 	    0x4000000,   /* ram_threshold: 64MB left for newlib heap */
@@ -579,9 +581,13 @@ hal_render_image_3d_cross(
 bool
 hal_make_save_directory(void)
 {
-	/* PS Vita saves go under ux0:user/00/savedata/<TITLE_ID>/ */
-	mkdir("ux0:user/00/savedata", 0755);
+	char save_subdir[PATH_SIZE];
+
+	/* PS Vita saves go under ux0:/data/<TITLE_ID>/save/ */
+	mkdir("ux0:/data", 0755);
 	mkdir(vita_savedata_dir, 0755);
+	snprintf(save_subdir, PATH_SIZE, "%s/save", vita_savedata_dir);
+	mkdir(save_subdir, 0755);
 	return true;
 }
 
@@ -589,7 +595,7 @@ hal_make_save_directory(void)
  * Convert a logical file name to a real filesystem path.
  *
  * Path resolution:
- *   "save/..." → "ux0:user/00/savedata/<TITLE_ID>/..."
+ *   "save/..." → "ux0:/data/<TITLE_ID>/..."
  *   Others      → "app0:/..." (read-only VPK content)
  */
 char *
