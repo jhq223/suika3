@@ -30,6 +30,7 @@
 
 #include <strato/strato.h>
 #include "callback.h"
+#include "vitamain.h"
 
 #include <psp2/ctrl.h>
 #include <psp2/touch.h>
@@ -204,6 +205,7 @@ process_touch(void)
 		y = ((int)touch.report[0].y + (int)touch.report[1].y) / 2;
 		x = x * 960 / 1920;
 		y = y * 544 / 1088;
+		vita_map_mouse(&x, &y);
 		hal_callback.on_mouse_press(HAL_MOUSE_LEFT, x, y);
 		hal_callback.on_mouse_release(HAL_MOUSE_LEFT, x, y);
 		hal_callback.on_key_press(HAL_KEY_ESCAPE);
@@ -216,6 +218,7 @@ process_touch(void)
 	if (touch.reportNum == 1) {
 		x = (int)touch.report[0].x * 960 / 1920;
 		y = (int)touch.report[0].y * 544 / 1088;
+		vita_map_mouse(&x, &y);
 
 		if (!is_touching) {
 			touch_start_x = x;

@@ -49,5 +49,6 @@ struct hal_wfile {
 };
 
 bool suika3_run(const char *base_path, const char *title_id);
+void vita_map_mouse(int *x, int *y);
 
 #endif

@@ -70,6 +70,9 @@
 static char *window_title;
 static int screen_width;
 static int screen_height;
+static float mouse_scale = 1.0f;
+static int mouse_ofs_x;
+static int mouse_ofs_y;
 
 /* Base path for resource resolution (set by suika3_run). */
 const char *vita_base_path;
@@ -150,6 +153,9 @@ suika3_run(const char *bp, const char *title_id)
 		goto fail_after_file;
 	}
 
+	/* Scale the viewport to fit the logical resolution within the display. */
+	update_viewport_size(SCREEN_WIDTH, SCREEN_HEIGHT);
+
 	if (!init_sound()) {
 		hal_log_error("Failed to initialize sound.");
 		goto fail_after_gl;
@@ -193,6 +199,62 @@ fail_after_file:
 	cleanup_file();
 fail:
 	return false;
+}
+
+/*
+ * Sets the viewport size to fit the logical resolution within the physical
+ * display while preserving aspect ratio.  Also computes the mouse coordinate
+ * mapping back to logical space.
+ */
+static void
+update_viewport_size(
+	int width,
+	int height)
+{
+	float aspect, use_width, use_height;
+	int orig_x, orig_y;
+	int viewport_width, viewport_height;
+
+	/* Calc the aspect ratio of the game. */
+	aspect = (float)screen_height / (float)screen_width;
+
+	/* Calc the height (temporarily with "width-first"). */
+	use_width = (float)width;
+	use_height = use_width * aspect;
+	mouse_scale = (float)screen_width / (float)width;
+
+	/* If height is not enough, calc the width (with "height-first"). */
+	if (use_height > (float)height) {
+		use_height = (float)height;
+		use_width = (float)use_height / aspect;
+		mouse_scale = (float)screen_height / (float)height;
+	}
+
+	/* Calc the viewport origin. */
+	orig_x = (int)((((float)width - use_width) / 2.0f) + 0.5);
+	orig_y = (int)((((float)height - use_height) / 2.0f) + 0.5);
+	mouse_ofs_x = orig_x;
+	mouse_ofs_y = orig_y;
+
+	/* Calc the viewport size. */
+	viewport_width = (int)use_width;
+	viewport_height = (int)use_height;
+
+	/* Update the screen offset and scale for drawing subsystem. */
+	opengl_set_screen(orig_x, orig_y, viewport_width, viewport_height);
+}
+
+/*
+ * Map display-space coordinates back to logical (design) coordinates.
+ * Called from the gamepad module to remap touch input.
+ */
+void
+vita_map_mouse(
+	int *x,
+	int *y)
+{
+	*x = (int)(((float)*x - (float)mouse_ofs_x) * mouse_scale);
+	*y = (int)(((float)*y - (float)mouse_ofs_y) * mouse_scale);
 }
 
 /*
