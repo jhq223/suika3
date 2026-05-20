@@ -106,6 +106,7 @@ extern void update_vitagamepad(void);
  */
 extern bool (*pf_init_hook_ptr)(int width, int height);
 extern bool pf_init_hook(int width, int height);
+static void update_viewport_size(int width, int height);
 bool
 suika3_run(const char *bp, const char *title_id)
 {
