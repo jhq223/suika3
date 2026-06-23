@@ -51,6 +51,11 @@ static int touch_last_y;
 static bool is_touching;
 static bool is_continuous_swipe_enabled;
 
+/* True after a two-finger gesture has fired, until the fingers are lifted.
+ * Prevents the System Menu key from repeating every frame while two fingers
+ * are held down. */
+static bool two_finger_handled;
+
 /*
  * Initialize the gamepad.
  */
@@ -62,6 +67,7 @@ init_vitagamepad(void)
 	prev_buttons = 0;
 	is_touching = false;
 	is_continuous_swipe_enabled = false;
+	two_finger_handled = false;
 }
 
 /*
@@ -182,13 +188,18 @@ process_analog(const SceCtrlData *pad)
 /*
  * Process front touch screen input.
  *
- * Gestures:
- *   Tap              → Confirm / Advance  (left click)
- *   Swipe Up         → History / Backlog  (HAL_KEY_L)
- *   Swipe Down       → Hide UI            (right click)
- *   Swipe Right      → Skip               (HAL_KEY_S)
- *   Swipe Left       → Page Up            (best-effort for Auto)
- *   Two-finger Tap   → System Menu        (HAL_KEY_ESCAPE)
+ * One-finger gestures (normal play):
+ *   Tap          → Confirm / Advance  (left click)
+ *   Swipe Down   → Hide UI            (right click)
+ *   Swipe Up     → History / Backlog  (HAL_KEY_L)
+ *   Swipe Right  → Skip toggle        (HAL_KEY_S)
+ *   Swipe Left   → Page Up
+ * Two-finger tap → System Menu        (HAL_KEY_ESCAPE)
+ *
+ * When the engine enables "skip by touch move" (via
+ * hal_set_continuous_swipe_enabled), a downward finger drag emulates a
+ * mouse-wheel scroll to fast-forward messages, instead of moving the
+ * pointer or triggering swipe shortcuts.
  */
 static void
 process_touch(void)
@@ -199,28 +210,30 @@ process_touch(void)
 
 	sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touch, 1);
 
-	if (touch.reportNum >= 2 && !is_touching) {
-		/* Two-finger tap → System Menu */
-		x = ((int)touch.report[0].x + (int)touch.report[1].x) / 2;
-		y = ((int)touch.report[0].y + (int)touch.report[1].y) / 2;
-		x = x * 960 / 1920;
-		y = y * 544 / 1088;
-		vita_map_mouse(&x, &y);
-		hal_callback.on_mouse_press(HAL_MOUSE_LEFT, x, y);
-		hal_callback.on_mouse_release(HAL_MOUSE_LEFT, x, y);
-		hal_callback.on_key_press(HAL_KEY_ESCAPE);
-		hal_callback.on_key_release(HAL_KEY_ESCAPE);
-		/* Drain remaining touch reports to prevent false single-tap. */
-		sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touch, 1);
+	/* Two-finger gesture → System Menu (fires once per touchdown). */
+	if (touch.reportNum >= 2) {
+		if (is_touching) {
+			hal_callback.on_touch_cancel();
+			is_touching = false;
+		}
+		if (!two_finger_handled) {
+			hal_callback.on_key_press(HAL_KEY_ESCAPE);
+			hal_callback.on_key_release(HAL_KEY_ESCAPE);
+			two_finger_handled = true;
+		}
 		return;
 	}
+	two_finger_handled = false;
 
 	if (touch.reportNum == 1) {
+		/* Map touch panel (1920x1088) to display (960x544), then to
+		 * logical coordinates. */
 		x = (int)touch.report[0].x * 960 / 1920;
 		y = (int)touch.report[0].y * 544 / 1088;
 		vita_map_mouse(&x, &y);
 
 		if (!is_touching) {
+			/* Finger down: start a drag/click (press immediately). */
 			touch_start_x = x;
 			touch_start_y = y;
 			touch_last_x = x;
@@ -228,12 +241,33 @@ process_touch(void)
 			is_touching = true;
 			hal_callback.on_mouse_press(HAL_MOUSE_LEFT, x, y);
 		} else {
+			int delta_y = y - touch_last_y;
 			touch_last_x = x;
 			touch_last_y = y;
-			hal_callback.on_mouse_move(x, y);
+
+			if (is_continuous_swipe_enabled) {
+				/* Skip-by-touch-move: wheel down fast-forwards text. */
+				if (delta_y > 0)
+					hal_callback.on_mouse_wheel(delta_y, 0);
+			} else {
+				hal_callback.on_mouse_move(x, y);
+			}
 		}
-	} else if (is_touching) {
-		/* Touch released — detect gesture from accumulated deltas. */
+		return;
+	}
+
+	/* Finger lifted — resolve the gesture (only if not skip-scrolling). */
+	if (!is_touching)
+		return;
+
+	if (is_continuous_swipe_enabled) {
+		/* Was fast-forwarding messages; just end the touch. */
+		hal_callback.on_touch_cancel();
+		is_touching = false;
+		return;
+	}
+
+	{
 		int dx = touch_last_x - touch_start_x;
 		int dy = touch_last_y - touch_start_y;
 
@@ -255,18 +289,17 @@ process_touch(void)
 			hal_callback.on_key_press(HAL_KEY_S);
 			hal_callback.on_key_release(HAL_KEY_S);
 		} else if (dx < -FLICK_DISTANCE && -dx > abs(dy)) {
-			/* Swipe Left → Page Up (best-effort, no Auto key in engine) */
+			/* Swipe Left → Page Up */
 			hal_callback.on_touch_cancel();
 			hal_callback.on_key_press(HAL_KEY_PAGEUP);
 			hal_callback.on_key_release(HAL_KEY_PAGEUP);
 		} else {
-			/* Tap → Confirm */
+			/* Tap → Confirm (complete the press from touch-down). */
 			hal_callback.on_mouse_release(HAL_MOUSE_LEFT,
 				touch_start_x, touch_start_y);
 		}
-
-		is_touching = false;
 	}
+	is_touching = false;
 }
 
 /*
