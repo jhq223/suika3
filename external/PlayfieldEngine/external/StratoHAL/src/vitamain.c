@@ -131,7 +131,7 @@ suika3_run(const char *bp, const char *title_id)
 	    0,           /* cdram_threshold: all CDRAM to vitaGL */
 	    0,           /* phycont_threshold: all PHYCONT to vitaGL */
 	    0,           /* cdlg_threshold: use ~9.2MB CDIALOG budget */
-	    SCE_GXM_MULTISAMPLE_4X);
+	    SCE_GXM_MULTISAMPLE_2X);
 	vglWaitVblankStart(GL_TRUE);
 
 	window_title = "suika3";
