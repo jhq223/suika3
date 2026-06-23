@@ -673,8 +673,11 @@ hal_make_real_path(
 		return NULL;
 	}
 
+	/* Match "save/..." or exactly "save" (the save directory). Use strcmp
+	 * for the bare name so resources like "savegame.png" are not
+	 * misrouted into the writable save directory. */
 	if (strncmp(fname, "save/", 5) == 0 ||
-	    strncmp(fname, "save", 4) == 0) {
+	    strcmp(fname, "save") == 0) {
 		snprintf(path, PATH_SIZE, "%s/%s", vita_savedata_dir, fname);
 	} else if (fname[0] == '/' || strchr(fname, ':') != NULL) {
 		snprintf(path, PATH_SIZE, "%s", fname);
