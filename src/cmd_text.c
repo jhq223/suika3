@@ -254,6 +254,9 @@ static bool need_dimming;
  * Others
  */
 
+/* Is immediate return? */
+static bool is_immediate_return;
+
 /* Page top flag. */
 static bool is_page_top;
 
@@ -342,7 +345,6 @@ s3i_tag_text(
 	void *p)
 {
 	bool cont;
-	int flag;
 
 	UNUSED_PARAMETER(p);
 
@@ -363,10 +365,6 @@ s3i_tag_text(
 		return true;
 	}
 
-	/* If Suika.s3Next is set.  */
-	if (s3_get_vm_int("s3Next", &flag) && flag != 0) {
-	}
-
 	/* Otherwise, process a frame. */
 	if (!preprocess())
 		return false;
@@ -375,7 +373,7 @@ s3i_tag_text(
 	postprocess();
 
 	/* Termination processing */
-	if (!s3_is_in_command_repetition())
+	if (!s3_is_in_command_repetition() || is_immediate_return)
 		if (!cleanup())
 			return false;
 
@@ -436,6 +434,7 @@ blit_process(void)
 	/* If dimming is needed */
 	if (need_dimming) {
 		blit_dimming();
+
 		/* If not in auto/skip mode */
 		if (s3_is_in_command_repetition())
 			s3_stop_command_repetition();
@@ -542,8 +541,10 @@ init(
 	if (!init_special_action(&exit_special)) {
 		return false;
 	} else {
-		if (exit_special)
+		if (exit_special) {
+			*cont = true;
 			return true;
+		}
 	}
 
 	/* Initialize if in auto mode */
@@ -716,6 +717,7 @@ init_flags_and_vars(void)
 	is_page_top = s3_is_page_top();
 
 	/* Others. */
+	is_immediate_return = false;
 	is_inline = false;
 }
 
@@ -768,7 +770,7 @@ init_special_action(bool *exit)
 	}
 
 	if (strcmp(action, "hide") == 0) {
-		/* Show the message box. */
+		/* Hide the message box. */
 		s3_show_msgbox(false);
 		s3_show_namebox(false);
 
@@ -778,8 +780,8 @@ init_special_action(bool *exit)
 	}
 	
 	if (strcmp(action, "show") == 0) {
-		/* Hide the message box. */
-		s3_show_msgbox(false);
+		/* Show the message box. */
+		s3_show_msgbox(true);
 
 		/* Exit. */
 		*exit = true;
@@ -814,6 +816,8 @@ clear_msgbox(void)
 		pen_x = msgbox_w - conf_msgbox_margin_right - conf_msgbox_font_size;
 		pen_y = conf_msgbox_margin_top;
 	}
+
+	s3_set_pen_position(pen_x, pen_y);
 }
 
 /* Initialize if in auto mode */
@@ -1092,7 +1096,7 @@ init_msgbox(void)
 		return true;
 
 	/* Do LF for page mode if `action="inline"` is not specified. */
-	if (s3_is_page_mode() & !is_page_top && !is_inline) {
+	if (s3_is_page_mode() && !is_page_top && !is_inline) {
 		if (!conf_msgbox_font_tategaki) {
 			pen_x = conf_msgbox_margin_left;
 			pen_y += conf_msgbox_margin_line;
@@ -1209,7 +1213,8 @@ play_voice(void)
 		return true;
 
 	/* Set the character volume */
-	set_character_volume_by_name(name_top);
+	if (name_top != NULL)
+		set_character_volume_by_name(name_top);
 
 	/* Play the PCM stream */
 	s3_set_mixer_input_file(S3_TRACK_VOICE, voice_file, false);
@@ -1405,8 +1410,10 @@ static void
 init_repetition(void)
 {
 	if (is_skippable() && !s3_is_non_interruptible() &&
-	    (s3_is_skip_mode() || (!s3_is_auto_mode() && s3_is_control_key_pressed()))) {
+	    (s3_is_skip_mode() ||
+	     (!s3_is_auto_mode() && s3_is_control_key_pressed()))) {
 		/* Do not repeat, display immediately */
+		is_immediate_return = true;
 	} else {
 		/* Make the command be called repeatedly */
 		s3_start_command_repetition();
@@ -1647,8 +1654,8 @@ frame_sysbtn(void)
 	}
 
 	/* Load. */
-	if (s3_is_s_key_pressed()) {
-		need_save_mode = true;
+	if (s3_is_l_key_pressed()) {
+		need_load_mode = true;
 		s3_clear_input_state();
 		return true;
 	}
@@ -2011,6 +2018,10 @@ is_fast_forward_by_click(void)
 
 	/* If Down key is pressed, move to click wait */
 	if (s3_is_down_key_pressed())
+		return true;
+
+	/* If Control key is pressed, move to click wait */
+	if (s3_is_control_key_pressed())
 		return true;
 
 	/* If clicked, move to click wait */
@@ -2531,13 +2542,13 @@ is_skippable(void)
 	bool is_seen;
 
 	is_seen = s3_get_seen_flags() != 0;
-	if (is_seen) {
+	if (is_seen)
 		return true;
-	} else {
-		if (conf_msgbox_skip_unseen)
-			return true;
-		return false;
-	}
+
+	if (conf_msgbox_skip_unseen)
+		return true;
+
+	return false;
 }
 
 /* Perform text-to-speech */
@@ -2631,7 +2642,7 @@ cleanup(void)
 
 	/* Hide the click animation */
 	s3_show_click(false);
-
+	
 	/*
 	 * When moving to the next command, set the active message to none
 	 *  - Keep it active when transitioning to system GUI

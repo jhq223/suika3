@@ -378,7 +378,6 @@
 #define S3_NORMAL_SAVE_SLOTS	(100)
 #define S3_QUICK_SAVE_INDEX	(100)
 
-
 /*
  * Types
  */
@@ -407,6 +406,7 @@ struct s3_image;
  */
 struct s3_fade_desc {
 	bool stay;
+	bool param_only;
 	const char *fname;
 	struct s3_image *image;
 	int x;
@@ -1137,6 +1137,22 @@ s3_fill_image_rect(
 s3_pixel_t *
 s3_get_image_pixels(
 	struct s3_image *image);
+
+/*
+ * Write an image to a file. (PNG)
+ */
+bool
+s3_write_image(
+	struct s3_image *image,
+	const char *file);
+
+/*
+ * Write an image to a file. (HCG)
+ */
+bool
+s3_write_image_hcg(
+	struct s3_image *image,
+	const char *file);
 
 /*
  * Stage Subsystem (stage.c)

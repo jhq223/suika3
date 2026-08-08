@@ -140,6 +140,9 @@ static bool Suika_createImageFromFile(void *p);
 static bool Suika_createImage(void *p);
 static bool Suika_getImageWidth(void *p);
 static bool Suika_getImageHeight(void *p);
+static bool Suika_getImagePixels(void *p);
+static bool Suika_updateImagePixels(void *p);
+static bool Suika_makePixel(void *p);
 static bool Suika_loadGlyphImage(void *p);
 static bool Suika_destroyImage(void *p);
 static bool Suika_notifyImageUpdate(void *p);
@@ -147,6 +150,8 @@ static bool Suika_drawImage(void *p);
 static bool Suika_drawImage3D(void *p);
 static bool Suika_makeColor(void *p);
 static bool Suika_fillImageRect(void *p);
+static bool Suika_writeImage(void *p);
+static bool Suika_writeImageHCG(void *p);
 
 /* Stage */
 static bool Suika_reloadStageImages(void *p);
@@ -504,6 +509,9 @@ static struct api_func api_func[] = {
 	{"createImage",			Suika_createImage,		1, dict_param},
 	{"getImageWidth",		Suika_getImageWidth,		1, dict_param},
 	{"getImageHeight",		Suika_getImageHeight,		1, dict_param},
+	{"getImagePixels",		Suika_getImagePixels,		1, dict_param},
+	{"updateImagePixels",		Suika_updateImagePixels,	1, dict_param},
+	{"makePixel",			Suika_makePixel,		1, dict_param},
 	{"loadGlyphImage",		Suika_loadGlyphImage,		1, dict_param},
 	{"destroyImage",		Suika_destroyImage,		1, dict_param},
 	{"notifyImageUpdate",		Suika_notifyImageUpdate,	1, dict_param},
@@ -511,6 +519,8 @@ static struct api_func api_func[] = {
 	{"drawImage3D",			Suika_drawImage3D,		1, dict_param},
 	{"makeColor",			Suika_makeColor,		1, dict_param},
 	{"fillImageRect",		Suika_fillImageRect,		1, dict_param},
+	{"writeImage",			Suika_writeImage,		1, dict_param},
+	{"writeImageHCG",		Suika_writeImageHCG,		1, dict_param},
 
 	/* Stage */
 	{"reloadStageImages",		Suika_reloadStageImages,	0, NULL},
@@ -1080,7 +1090,7 @@ serialize_printer(
 
 	switch (type) {
 	case NOCT_VALUE_INT:
-		if (!noct_get_int(env, value, (int32_t *)&ival))
+		if (!noct_get_int(env, value, &ival))
 			return false;
 		snprintf(digits, sizeof(digits), "%d", ival);
 		strncat(buf, digits, size - strlen(buf) - 1);
@@ -3033,6 +3043,120 @@ Suika_getImageHeight(void *p)
 }
 
 static bool
+Suika_getImagePixels(void *p)
+{
+	int image;
+	struct s3_image *img;
+	NoctEnv *env;
+	NoctValue val;
+	bool ret;
+
+	UNUSED_PARAMETER(p);
+
+	ret = false;
+	do {
+		env = pf_get_vm_env();
+		noct_pin_local(env, 1, &val);
+
+		/* Get the argument. */
+		if (!pf_get_call_arg_int("image", &image, false, -1))
+			break;
+
+		img = s3i_int_to_image(image);
+		if (img == NULL)
+			break;
+
+		if (!noct_make_packed(env,
+				      &val,
+				      NOCT_PACKED_UINT32,
+				      img->width * img->height * 4,
+				      img->width * img->height,
+				      s3_get_image_pixels(img)))
+			return false;
+
+		/* Set the return value. */
+		if (!noct_set_return(env, &val))
+			break;
+
+		noct_unpin_local(env, 1, &val);
+
+		ret = true;
+	} while (0);
+
+	return ret;
+}
+
+static bool
+Suika_updateImagePixels(void *p)
+{
+	int image;
+	struct s3_image *img;
+	bool ret;
+
+	UNUSED_PARAMETER(p);
+
+	ret = false;
+	do {
+		/* Get the argument. */
+		if (!pf_get_call_arg_int("image", &image, false, -1))
+			break;
+
+		img = s3i_int_to_image(image);
+		if (img == NULL)
+			break;
+
+		s3_notify_image_update(img);
+
+		/* Set the return value. */
+		if (!pf_set_return_int(1))
+			break;
+
+		ret = true;
+	} while (0);
+
+	return ret;
+}
+
+static bool
+Suika_makePixel(void *p)
+{
+	uint32_t r, g, b, a, pix;
+	bool ret;
+
+	UNUSED_PARAMETER(p);
+
+	ret = false;
+	do {
+		/* Get the arguments. */
+		if (!pf_get_call_arg_int("r", (int *)&r, false, -1))
+			break;
+		if (!pf_get_call_arg_int("g", (int *)&g, false, -1))
+			break;
+		if (!pf_get_call_arg_int("b", (int *)&b, false, -1))
+			break;
+		if (!pf_get_call_arg_int("a", (int *)&a, false, -1))
+			break;
+
+		if (r > 255)
+			r = 255;
+		if (g > 255)
+			g = 255;
+		if (b > 255)
+			b = 255;
+
+		pix = s3_make_pixel(a, r, g, b);
+
+		/* Set the return value. */
+		if (!pf_set_return_int(pix))
+			break;
+
+		ret = true;
+	} while (0);
+
+	return ret;
+}
+
+static bool
 Suika_loadGlyphImage(void *p)
 {
 	int font_type;
@@ -3396,6 +3520,86 @@ Suika_fillImageRect(void *p)
 
 		ret = true;
 	} while (0);
+
+	return ret;
+}
+
+static bool
+Suika_writeImage(void *p)
+{
+	int image;
+	char *file;
+
+	struct s3_image *img;
+	bool ret;
+
+	UNUSED_PARAMETER(p);
+
+	ret = false;
+	file = NULL;
+	do {
+		/* Get the argument. */
+		if (!pf_get_call_arg_int("image", &image, false, -1))
+			break;
+		if (!pf_get_call_arg_string("file", &file, false, NULL))
+			break;
+
+		img = s3i_int_to_image(image);
+		if (img == NULL)
+			break;
+
+		if (!s3_write_image(img, file))
+			break;
+
+		/* Set the return value. */
+		if (!pf_set_return_int(1))
+			break;
+
+		ret = true;
+	} while (0);
+
+	if (file != NULL)
+		free(file);
+
+	return ret;
+}
+
+static bool
+Suika_writeImageHCG(void *p)
+{
+	int image;
+	char *file;
+
+	struct s3_image *img;
+	bool ret;
+
+	UNUSED_PARAMETER(p);
+
+	ret = false;
+	file = NULL;
+	do {
+		/* Get the argument. */
+		if (!pf_get_call_arg_int("image", &image, false, -1))
+			break;
+		if (!pf_get_call_arg_string("file", &file, false, NULL))
+			break;
+
+		img = s3i_int_to_image(image);
+		if (img == NULL)
+			break;
+
+		if (!s3_write_image_hcg(img, file))
+			break;
+
+		/* Set the return value. */
+		if (!pf_set_return_int(1))
+			break;
+
+		ret = true;
+	} while (0);
+
+	if (file != NULL)
+		free(file);
 
 	return ret;
 }

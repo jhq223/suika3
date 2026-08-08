@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.13)
-project(playfield LANGUAGES C CXX)
+project(playfield LANGUAGES C)
+
+if(   WIN32
+   OR CMAKE_SYSTEM_NAME STREQUAL "Haiku"
+   OR PLAYFIELD_TARGET_OPENHARMONY)
+  enable_language(CXX)
+endif()
 
 #
 # Configuration
@@ -46,6 +52,7 @@ option(PLAYFIELD_ENABLE_SHARED           "Build a dynamic library"              
 option(PLAYFIELD_ENABLE_OBJECT           "Build an object library"                    OFF)
 option(PLAYFIELD_ENABLE_BIN              "Build an executable"                        OFF)
 option(PLAYFIELD_ENABLE_DIST             "Link shared libraries"                      OFF)
+option(PLAYFIELD_ENABLE_DIST_CONSERVATIVE "Link shared libraries"                      OFF)
 option(PLAYFIELD_ENABLE_INSTALL          "Install library and header files"           OFF)
 option(PLAYFIELD_ENABLE_JIT              "Enable JIT"                                 OFF)
 option(PLAYFIELD_ENABLE_I18N             "Enable translation"                         OFF)
@@ -266,6 +273,11 @@ if(NOT PLAYFIELD_ENABLE_DIST)
   # Merge object files
   set(STRATO_ENABLE_OBJECT ON)
 
+  # Use system libraries
+  if(PLAYFIELD_ENABLE_DIST_CONSERVATIVE)
+    set(STRATO_ENABLE_DIST ON)
+  endif()
+
   # Propagate the target and its specific options.
   if(PLAYFIELD_TARGET_WINDOWS)
     set(STRATO_TARGET_WINDOWS ON)
@@ -371,7 +383,7 @@ if(NOT PLAYFIELD_ENABLE_DIST)
 
   # Console output
   if(PLAYFIELD_ENABLE_CONSOLE)
-    set(STRATO_ENABLE_CONSOLE)
+    set(STRATO_ENABLE_CONSOLE ON)
   endif()
 
   # XDG-Portal
@@ -506,26 +518,36 @@ elseif(PLAYFIELD_ENABLE_OBJECT)
 endif()
 
 # Determine the objects if we use static linking.
-if(NOT PLAYFIELD_ENABLE_DIST)
-  if(NOT PLAYFIELD_TARGET_PC98 AND NOT PLAYFIELD_TARGET_PCAT)
-    set(
-      PLAYFIELD_DEPS
-      $<TARGET_OBJECTS:png>
-      $<TARGET_OBJECTS:jpeg>
-      $<TARGET_OBJECTS:webp>
-      $<TARGET_OBJECTS:vorbisfile>
-      $<TARGET_OBJECTS:vorbis>
-      $<TARGET_OBJECTS:ogg>
-      $<TARGET_OBJECTS:freetype>
-      $<TARGET_OBJECTS:z>
-    )      
+if(NOT PLAYFIELD_ENABLE_DIST AND NOT PLAYFIELD_ENABLE_DIST_CONSERVATIVE)
+  if(PLAYFIELD_TARGET_PC98 OR PLAYFIELD_TARGET_PCAT)
+    set(PLAYFIELD_DEPS
+        $<TARGET_OBJECTS:png>
+        $<TARGET_OBJECTS:tremor>
+        $<TARGET_OBJECTS:ogg>
+        $<TARGET_OBJECTS:freetype>
+        $<TARGET_OBJECTS:z>
+    )
   else()
-    set(
-      PLAYFIELD_DEPS
-      $<TARGET_OBJECTS:png>
-      $<TARGET_OBJECTS:freetype>
-      $<TARGET_OBJECTS:z>
-    )      
+    if(NOT CMAKE_C_COMPILER_ID MATCHES "Watcom")
+      set(PLAYFIELD_DEPS
+        $<TARGET_OBJECTS:png>
+        $<TARGET_OBJECTS:jpeg>
+        $<TARGET_OBJECTS:webp>
+        $<TARGET_OBJECTS:tremor>
+        $<TARGET_OBJECTS:ogg>
+        $<TARGET_OBJECTS:freetype>
+        $<TARGET_OBJECTS:z>
+      )
+    else()
+      set(PLAYFIELD_DEPS
+        $<TARGET_OBJECTS:png>
+        $<TARGET_OBJECTS:jpeg>
+        $<TARGET_OBJECTS:tremor>
+        $<TARGET_OBJECTS:ogg>
+        $<TARGET_OBJECTS:freetype>
+        $<TARGET_OBJECTS:z>
+      )
+    endif()
   endif()
 endif()
 
@@ -658,7 +680,7 @@ endif()
 if(PLAYFIELD_TARGET_WINDOWS95)
   if(MSVC)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
-  else()
+  elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
     add_compile_definitions(_WIN32_WINNT=0x0400 __USE_MINGW_ANSI_STDIO=1)
   endif()
 endif()
@@ -670,7 +692,7 @@ endif()
 
 # Unsafe
 if(PLAYFIELD_ENABLE_UNSAFE)
-    target_compile_definitions(playfield PRIVATE PF_USE_UNSAFE)
+  target_compile_definitions(playfield PRIVATE PF_USE_UNSAFE)
 endif()
 
 # ---
@@ -683,7 +705,7 @@ endif()
 if(PLAYFIELD_TARGET_WINDOWS)
   if(MSVC)
     target_compile_options(playfield PUBLIC /utf-8)
-  else()
+  elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
     target_compile_options(playfield PUBLIC -municode -finput-charset=utf-8 -fexec-charset=utf-8)
   endif()
 endif()
@@ -692,7 +714,7 @@ endif()
 if(PLAYFIELD_TARGET_WINDOWS95)
   if(MSVC)
     target_compile_options(playfield PUBLIC /utf-8)
-  else()
+  elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
     target_compile_options(playfield PUBLIC -finput-charset=utf-8 -fexec-charset=shift-jis)
   endif()
 endif()
@@ -704,16 +726,23 @@ endif()
 #
 
 # Link NoctLang and Strato
-if(NOT PLAYFIELD_ENABLE_DIST)
+if(PLAYFIELD_ENABLE_DIST)
+  if(SUIKA_ENABLE_UNSAFE)
+    set(NOCTAPI_LIB Noct::api)
+  endif()
   target_link_libraries(playfield PUBLIC
-    noct
-    strato
+    ${NOCTAPI_LIB}
+    ${NOCT_LIBRARY}
+    ${STRATO_LIBRARY}
   )
 else()
+  if(SUIKA_ENABLE_UNSAFE)
+    set(NOCTAPI_LIB noctapi)
+  endif()
   target_link_libraries(playfield PUBLIC
-    ${NOCT_LIBRARY}
-    noctapi
-    ${STRATO_LIBRARY}
+    ${NOCTAPI_LIB}
+    noct
+    strato
   )
 endif()
 
@@ -797,7 +826,7 @@ if(PLAYFIELD_ENABLE_BIN)
       else()
         target_link_options(playfieldbin PRIVATE /SUBSYSTEM:CONSOLE /ENTRY:wWinMainCRTStartup /MANIFEST:NO)
       endif()
-    else()
+    elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
       if(NOT PLAYFIELD_ENABLE_CONSOLE)
         target_link_options(playfieldbin PRIVATE -mwindows -static -static-libgcc -Wl,-u,wWinMain -Wl,-u,_wWinMain@16)
       else()
@@ -810,7 +839,7 @@ if(PLAYFIELD_ENABLE_BIN)
   if(PLAYFIELD_TARGET_WINDOWS95)
     if(MSVC)
       target_link_options(playfieldbin PUBLIC /SUBSYSTEM:WINDOWS)
-    else()
+    elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
       target_link_options(playfieldbin PRIVATE -mwindows -static -static-libgcc -Wl,-u,WinMain -Wl,-u,_WinMain@16)
     endif()
   endif()
@@ -1005,7 +1034,7 @@ if(PLAYFIELD_ENABLE_EDITOR)
     target_compile_options(playfield-editor PRIVATE /utf-8)
     target_compile_definitions(playfield-editor PRIVATE UNICODE _UNICODE)
     target_link_options(playfield-editor PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:wWinMainCRTStartup /MANIFEST:NO)
-  else()
+  elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
     target_compile_options(playfield-editor PRIVATE -municode)
     target_link_options(playfield-editor PRIVATE -mwindows -municode)
   endif()

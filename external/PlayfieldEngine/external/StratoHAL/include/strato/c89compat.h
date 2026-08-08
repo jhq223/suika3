@@ -154,6 +154,18 @@ extern "C" {
 #define HAL_ARCH_LE	/* Default, no MSVC support yet */
 #endif
 
+#elif defined(__sparc) && defined(__arch64__)
+
+/* SPARC 64bit */
+#define HAL_ARCH_SPARC64
+#define HAL_ARCH_BE
+
+#elif defined(__m68k__)
+
+/* m68k */
+#define HAL_ARCH_M68K
+#define HAL_ARCH_BE
+
 #endif
 
 /*
@@ -493,6 +505,7 @@ typedef unsigned long long uint64_t;
  * Math
  */
 #if defined(__WATCOMC__)
+#include <math.h>
 #if !defined(lroundf)
 #define lroundf round
 static INLINE double round(double x)

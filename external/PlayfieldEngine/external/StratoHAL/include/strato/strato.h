@@ -51,102 +51,102 @@ extern "C" {
  * Keycode.
  */
 enum hal_key_code {
-	HAL_KEY_ESCAPE,
-	HAL_KEY_RETURN,
-	HAL_KEY_SPACE,
-	HAL_KEY_TAB,
-	HAL_KEY_BACKSPACE,
-	HAL_KEY_DELETE,
-	HAL_KEY_HOME,
-	HAL_KEY_END,
-	HAL_KEY_PAGEUP,
-	HAL_KEY_PAGEDOWN,
-	HAL_KEY_SHIFT,
-	HAL_KEY_CONTROL,
-	HAL_KEY_ALT,
-	HAL_KEY_UP,
-	HAL_KEY_DOWN,
-	HAL_KEY_LEFT,
-	HAL_KEY_RIGHT,
-	HAL_KEY_A,
-	HAL_KEY_B,
-	HAL_KEY_C,
-	HAL_KEY_D,
-	HAL_KEY_E,
-	HAL_KEY_F,
-	HAL_KEY_G,
-	HAL_KEY_H,
-	HAL_KEY_I,
-	HAL_KEY_J,
-	HAL_KEY_K,
-	HAL_KEY_L,
-	HAL_KEY_M,
-	HAL_KEY_N,
-	HAL_KEY_O,
-	HAL_KEY_P,
-	HAL_KEY_Q,
-	HAL_KEY_R,
-	HAL_KEY_S,
-	HAL_KEY_T,
-	HAL_KEY_U,
-	HAL_KEY_V,
-	HAL_KEY_W,
-	HAL_KEY_X,
-	HAL_KEY_Y,
-	HAL_KEY_Z,
-	HAL_KEY_1,
-	HAL_KEY_2,
-	HAL_KEY_3,
-	HAL_KEY_4,
-	HAL_KEY_5,
-	HAL_KEY_6,
-	HAL_KEY_7,
-	HAL_KEY_8,
-	HAL_KEY_9,
-	HAL_KEY_0,
-	HAL_KEY_F1,
-	HAL_KEY_F2,
-	HAL_KEY_F3,
-	HAL_KEY_F4,
-	HAL_KEY_F5,
-	HAL_KEY_F6,
-	HAL_KEY_F7,
-	HAL_KEY_F8,
-	HAL_KEY_F9,
-	HAL_KEY_F10,
-	HAL_KEY_F11,
-	HAL_KEY_F12,
-	HAL_KEY_GAMEPAD_UP,
-	HAL_KEY_GAMEPAD_DOWN,
-	HAL_KEY_GAMEPAD_LEFT,
-	HAL_KEY_GAMEPAD_RIGHT,
-	HAL_KEY_GAMEPAD_A,
-	HAL_KEY_GAMEPAD_B,
-	HAL_KEY_GAMEPAD_X,
-	HAL_KEY_GAMEPAD_Y,
-	HAL_KEY_GAMEPAD_L,
-	HAL_KEY_GAMEPAD_R,
-	HAL_KEY_MAX,
+	HAL_KEY_ESCAPE          = 0,
+	HAL_KEY_RETURN          = 1,
+	HAL_KEY_SPACE           = 2,
+	HAL_KEY_TAB             = 3,
+	HAL_KEY_BACKSPACE       = 4,
+	HAL_KEY_DELETE          = 5,
+	HAL_KEY_HOME            = 6,
+	HAL_KEY_END             = 7,
+	HAL_KEY_PAGEUP          = 8,
+	HAL_KEY_PAGEDOWN        = 9,
+	HAL_KEY_SHIFT           = 10,
+	HAL_KEY_CONTROL         = 11,
+	HAL_KEY_ALT             = 12,
+	HAL_KEY_UP              = 13,
+	HAL_KEY_DOWN            = 14,
+	HAL_KEY_LEFT            = 15,
+	HAL_KEY_RIGHT           = 16,
+	HAL_KEY_A               = 17,
+	HAL_KEY_B               = 18,
+	HAL_KEY_C               = 19,
+	HAL_KEY_D               = 20,
+	HAL_KEY_E               = 21,
+	HAL_KEY_F               = 22,
+	HAL_KEY_G               = 23,
+	HAL_KEY_H               = 24,
+	HAL_KEY_I               = 25,
+	HAL_KEY_J               = 26,
+	HAL_KEY_K               = 27,
+	HAL_KEY_L               = 28,
+	HAL_KEY_M               = 29,
+	HAL_KEY_N               = 30,
+	HAL_KEY_O               = 31,
+	HAL_KEY_P               = 32,
+	HAL_KEY_Q               = 33,
+	HAL_KEY_R               = 34,
+	HAL_KEY_S               = 35,
+	HAL_KEY_T               = 36,
+	HAL_KEY_U               = 37,
+	HAL_KEY_V               = 38,
+	HAL_KEY_W               = 39,
+	HAL_KEY_X               = 40,
+	HAL_KEY_Y               = 41,
+	HAL_KEY_Z               = 42,
+	HAL_KEY_1               = 43,
+	HAL_KEY_2               = 44,
+	HAL_KEY_3               = 45,
+	HAL_KEY_4               = 46,
+	HAL_KEY_5               = 47,
+	HAL_KEY_6               = 48,
+	HAL_KEY_7               = 49,
+	HAL_KEY_8               = 50,
+	HAL_KEY_9               = 51,
+	HAL_KEY_0               = 52,
+	HAL_KEY_F1              = 53,
+	HAL_KEY_F2              = 54,
+	HAL_KEY_F3              = 55,
+	HAL_KEY_F4              = 56,
+	HAL_KEY_F5              = 57,
+	HAL_KEY_F6              = 58,
+	HAL_KEY_F7              = 59,
+	HAL_KEY_F8              = 60,
+	HAL_KEY_F9              = 61,
+	HAL_KEY_F10             = 62,
+	HAL_KEY_F11             = 63,
+	HAL_KEY_F12             = 64,
+	HAL_KEY_GAMEPAD_UP      = 65,
+	HAL_KEY_GAMEPAD_DOWN    = 66,
+	HAL_KEY_GAMEPAD_LEFT    = 67,
+	HAL_KEY_GAMEPAD_RIGHT   = 68,
+	HAL_KEY_GAMEPAD_A       = 69,
+	HAL_KEY_GAMEPAD_B       = 70,
+	HAL_KEY_GAMEPAD_X       = 71,
+	HAL_KEY_GAMEPAD_Y       = 72,
+	HAL_KEY_GAMEPAD_L       = 73,
+	HAL_KEY_GAMEPAD_R       = 74,
+	HAL_KEY_MAX             = 75,
 };
 
 /*
  * Mouse button.
  */
 enum hal_mouse_button {
-	HAL_MOUSE_LEFT,
-	HAL_MOUSE_RIGHT,
+	HAL_MOUSE_LEFT  = 0,
+	HAL_MOUSE_RIGHT = 1,
 };
 
 /*
  * Analog input.
  */
 enum hal_analog_input {
-	HAL_ANALOG_X1,
-	HAL_ANALOG_Y1,
-	HAL_ANALOG_X2,
-	HAL_ANALOG_Y2,
-	HAL_ANALOG_L,
-	HAL_ANALOG_R,
+	HAL_ANALOG_X1 = 0,
+	HAL_ANALOG_Y1 = 1,
+	HAL_ANALOG_X2 = 2,
+	HAL_ANALOG_Y2 = 3,
+	HAL_ANALOG_L  = 4,
+	HAL_ANALOG_R  = 5,
 };
 
 /*
@@ -359,11 +359,22 @@ hal_open_wfile(
 	struct hal_wfile **wf);
 
 /*
- * Write to a file stream.
+ * Write to a file stream. (encoded)
  */
 HAL_DLL
 bool
 hal_write_wfile(
+	struct hal_wfile *wf,
+	const void *buf,
+	size_t size,
+	size_t *ret);
+
+/*
+ * Write to a file stream. (non-encoded)
+ */
+HAL_DLL
+bool
+hal_write_wfile_plain(
 	struct hal_wfile *wf,
 	const void *buf,
 	size_t size,
@@ -428,7 +439,11 @@ struct hal_image {
 /*
  * Determine the pixel byte order.
  */
-#if !defined(HAL_USE_QT) && \
+#if defined(HAL_TARGET_SOLARIS11) && defined(HAL_ARCH_BE)
+#define ORDER_RGBA
+#elif defined(HAL_TARGET_LINUX) && defined(HAL_ARCH_BE)
+#define ORDER_RGBA
+#elif !defined(HAL_USE_QT) && \
     ( \
         defined(HAL_TARGET_WINDOWS) || \
         defined(HAL_TARGET_MACOS) || \
@@ -436,6 +451,8 @@ struct hal_image {
         defined(HAL_USE_X11_SOFTRENDER) || \
 	defined(HAL_USE_FBDEV) || \
         defined(HAL_TARGET_HAIKU) || \
+        defined(HAL_TARGET_PC98) || \
+        defined(HAL_TARGET_PCAT) || \
 	defined(HAL_TARGET_UNITY) \
     )
 	/* Use BGRA on Direct3D, Metal, Unit, and Soft3D. */
@@ -604,6 +621,16 @@ hal_create_image_with_jpeg(
 HAL_DLL
 bool
 hal_create_image_with_webp(
+	const uint8_t *data,
+	size_t size,
+	struct hal_image **img);
+
+/*
+ * Create an image with a HCG file.
+ */
+HAL_DLL
+bool
+hal_create_image_with_hcg(
 	const uint8_t *data,
 	size_t size,
 	struct hal_image **img);
@@ -980,6 +1007,22 @@ void
 hal_notify_image_free(
 	struct hal_image *img);
 
+/*
+ * Write an image to a file. (PNG)
+ */
+bool
+hal_write_image(
+	struct hal_image *image,
+	struct hal_wfile *wf);
+
+/*
+ * Write an image to a file. (HCG)
+ */
+bool
+hal_write_image_hcg(
+	struct hal_image *image,
+	struct hal_wfile *wf);
+
 /* --- */
 
 /*
@@ -1007,7 +1050,7 @@ hal_load_glyph_data(
 HAL_DLL
 void
 hal_destroy_glyph_data(
-	int index);
+	int slot);
 
 /*
  * Get a top character of a utf-8 string as utf-32.
@@ -1064,7 +1107,7 @@ hal_get_glyph_width_and_height(
 HAL_DLL
 int
 hal_get_string_width(
-	int font_type,
+	int slot,
 	int font_size,
 	const char *mbs);
 
@@ -1074,7 +1117,7 @@ hal_get_string_width(
 HAL_DLL
 int
 hal_get_string_height(
-	int font_type,
+	int slot,
 	int font_size,
 	const char *mbs);
 
@@ -1097,7 +1140,7 @@ HAL_DLL
 bool
 hal_draw_glyph(
 	struct hal_image *img,
-	int font_index,
+	int slot,
 	int font_size,
 	int base_font_size,
 	int outline_size,
@@ -1655,6 +1698,7 @@ hal_bootstrap(
     defined(HAL_TARGET_POSIX)		||	\
     defined(HAL_TARGET_MACOS)		||	\
     defined(HAL_TARGET_IOS)             ||      \
+    defined(HAL_TARGET_HAIKU)		||	\
     defined(HAL_TARGET_PC98)            ||      \
     defined(HAL_TARGET_PCAT)          
 #define HAL_DEFINE_MAIN()				\
@@ -1762,7 +1806,7 @@ int WINAPI WinMain(							\
 	{								\
 		int WINAPI hal_WinMain(HINSTANCE,			\
 				       HINSTANCE,			\
-				       LPWSTR,				\
+				       LPSTR,				\
 				       int);				\
 		hal_bootstrap_ptr = hal_bootstrap;			\
 		chain_ptr1 = chain1;					\
@@ -1793,8 +1837,7 @@ int WINAPI WinMain(							\
 	}
 #endif
 
-
-#if (defined(HAL_TARGET_UNITY) || defined(HAL_TARGET_PSVITA)) && !defined(HAL_USE_DLL)
+#if defined(HAL_TARGET_PSVITA) && !defined(HAL_USE_DLL)
 #define HAL_DEFINE_MAIN()						\
 	static void so_init(void)					\
 	{								\
@@ -1804,6 +1847,19 @@ int WINAPI WinMain(							\
 	static void so_init(void)					\
 	{								\
 		hal_bootstrap_ptr = hal_bootstrap;			\
+		chain_ptr1 = chain1;					\
+		chain_ptr2 = chain2;					\
+	}
+#endif
+
+#if defined(HAL_TARGET_UNITY)
+#define HAL_DEFINE_MAIN()						\
+	void so_init(void)						\
+	{								\
+	}
+#define HAL_DEFINE_MAIN_CHAIN(chain_ptr1, chain1, chain_ptr2, chain2)	\
+	void so_init(void)						\
+	{								\
 		chain_ptr1 = chain1;					\
 		chain_ptr2 = chain2;					\
 	}

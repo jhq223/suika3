@@ -61,7 +61,10 @@
 /*
  * Check if a value is a reference type.
  */
-#define IS_REF_VAL(v)			((v)->type >= NOCT_VALUE_STRING && (v)->type <= NOCT_VALUE_DICT)
+#define IS_REF_VAL(v)			((v)->type == NOCT_VALUE_STRING || \
+					 (v)->type == NOCT_VALUE_ARRAY || \
+					 (v)->type == NOCT_VALUE_DICT || \
+					 (v)->type == NOCT_VALUE_PACKED)
 
 /*
  * Check if an object is in the nursery or graduate region.
@@ -363,6 +366,10 @@ rt_gc_alloc_array(
 	assert(env != NULL);
 	assert(size > 0);
 
+	/* Minimum size. */
+	if (size == 1)
+		size = 2;
+
 	/* Check for overflow. */
 	if (size >= SIZE_MAX / sizeof(struct rt_value)) {
 		rt_out_of_memory(env);
@@ -436,6 +443,10 @@ rt_gc_alloc_array_graduate(
 	assert(env != NULL);
 	assert(size > 0);
 
+	/* Minimum size. */
+	if (size == 1)
+		size = 2;
+
 	/* Check for overflow. */
 	if (size >= SIZE_MAX / sizeof(struct rt_value)) {
 		rt_out_of_memory(env);
@@ -505,6 +516,10 @@ rt_gc_alloc_array_tenure(
 
 	assert(env != NULL);
 	assert(size > 0);
+
+	/* Minimum size. */
+	if (size == 1)
+		size = 2;
 
 	/* Check for overflow. */
 	if (size >= SIZE_MAX / sizeof(struct rt_value)) {
@@ -577,6 +592,10 @@ rt_gc_alloc_dict(
 
 	assert(env != NULL);
 	assert(size > 0);
+
+	/* Minimum size. */
+	if (size == 1)
+		size = 2;
 
 	/* Check for overflow. */
 	if (size >= SIZE_MAX / 2 / sizeof(struct rt_value)) {
@@ -657,6 +676,10 @@ rt_gc_alloc_dict_graduate(
 	assert(env != NULL);
 	assert(size > 0);
 
+	/* Minimum size. */
+	if (size == 1)
+		size = 2;
+
 	/* Check for overflow. */
 	if (size >= SIZE_MAX / 2 / sizeof(struct rt_value)) {
 		rt_out_of_memory(env);
@@ -733,6 +756,10 @@ rt_gc_alloc_dict_tenure(
 
 	assert(env != NULL);
 	assert(size > 0);
+
+	/* Minimum size. */
+	if (size == 1)
+		size = 2;
 
 	/* Check for overflow. */
 	if (size >= SIZE_MAX / 2 / sizeof(struct rt_value)) {
@@ -880,7 +907,6 @@ rt_gc_alloc_packed_graduate(
 	void *p;
 
 	assert(env != NULL);
-	assert(size > 0);
 	assert(elem_size > 0);
 
 	/* If use a preallocated buffer. */
@@ -946,7 +972,6 @@ rt_gc_alloc_packed_tenure(
 	int retry;
 
 	assert(env != NULL);
-	assert(size > 0);
 
 	/* If use a preallocated buffer. */
 	if (preallocated != NULL)
@@ -1186,7 +1211,7 @@ rt_gc_young_gc_body(
 					arr->table[i].val.obj = arr->table[i].val.obj->forward;
 				}
 			}
-		} else {
+		} else  {
 			struct rt_dict *dict = (struct rt_dict *)obj;
 			for (i = 0; i < dict->alloc_size; i++) {
 				if (dict->key[i].type != NOCT_VALUE_STRING)
@@ -1642,7 +1667,7 @@ rt_gc_promote_packed(
 {
 	struct rt_packed *old_packed, *new_packed;
 
-	/* Allocate a string object. */
+	/* Allocate a packed object. */
 	old_packed = (struct rt_packed *)obj;
 	new_packed = rt_gc_alloc_packed_tenure(env,
 					       old_packed->type,
@@ -1651,6 +1676,9 @@ rt_gc_promote_packed(
 					       (old_packed->size == 0) ? old_packed->packed_buffer : NULL);
 	if (new_packed == NULL)
 		return false;
+
+	if (old_packed->size != 0)
+		memcpy(new_packed->packed_buffer, old_packed->packed_buffer, old_packed->size);
 
 	/* Set the forwarding pointer. */
 	obj->forward = &new_packed->head;
@@ -1785,7 +1813,7 @@ rt_gc_copy_dict_to_graduate(
 	return &new_obj->head;
 }
 
-/* Copies a string object to the graduate region. */
+/* Copies a packed object to the graduate region. */
 static struct rt_gc_object *
 rt_gc_copy_packed_to_graduate(
 	struct rt_env *env,

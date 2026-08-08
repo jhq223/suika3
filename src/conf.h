@@ -37,7 +37,16 @@
  */
 
 /* Game title */
+extern char *conf_game_title;
 extern char *conf_game_title_en;
+extern char *conf_game_title_fr;
+extern char *conf_game_title_es;
+extern char *conf_game_title_de;
+extern char *conf_game_title_it;
+extern char *conf_game_title_ru;
+extern char *conf_game_title_el;
+extern char *conf_game_title_zh_cn;
+extern char *conf_game_title_zh_tw;
 extern char *conf_game_title_ja;
 
 /* Novel mode */
@@ -296,7 +305,7 @@ extern char *conf_skipmode_leave_se;
  * GUI Settings
  */
 
-/* Save index font */
+/* Save Index Font */
 extern int conf_gui_save_index_font_select;
 extern int conf_gui_save_index_font_size;
 extern int conf_gui_save_index_font_r;
@@ -310,7 +319,7 @@ extern int conf_gui_save_index_font_ruby;
 extern bool conf_gui_save_index_font_tategaki;
 extern int conf_gui_save_index_margin_char;
 
-/* Save date font */
+/* Save Date Font */
 extern int conf_gui_save_date_font_select;
 extern int conf_gui_save_date_font_size;
 extern int conf_gui_save_date_font_r;
@@ -324,7 +333,7 @@ extern int conf_gui_save_date_font_ruby;
 extern bool conf_gui_save_date_font_tategaki;
 extern int conf_gui_save_date_margin_char;
 
-/* Save chapter font */
+/* Save Chapter Font */
 extern int conf_gui_save_chapter_font_select;
 extern int conf_gui_save_chapter_font_size;
 extern int conf_gui_save_chapter_font_r;
@@ -338,7 +347,7 @@ extern int conf_gui_save_chapter_font_ruby;
 extern bool conf_gui_save_chapter_font_tategaki;
 extern int conf_gui_save_chapter_margin_char;
 
-/* Save message font */
+/* Save Message Font */
 extern int conf_gui_save_msg_font_select;
 extern int conf_gui_save_msg_font_size;
 extern int conf_gui_save_msg_font_r;
@@ -402,6 +411,20 @@ extern int conf_gui_preview_font_outline_g;
 extern int conf_gui_preview_font_outline_b;
 extern int conf_gui_preview_font_ruby;
 extern bool conf_gui_preview_font_tategaki;
+
+/* Variable Text Font */
+extern int conf_gui_var_font_select;
+extern int conf_gui_var_font_size;
+extern int conf_gui_var_font_r;
+extern int conf_gui_var_font_g;
+extern int conf_gui_var_font_b;
+extern int conf_gui_var_font_outline_width;
+extern int conf_gui_var_font_outline_r;
+extern int conf_gui_var_font_outline_g;
+extern int conf_gui_var_font_outline_b;
+extern int conf_gui_var_font_ruby;
+extern bool conf_gui_var_font_tategaki;
+extern int conf_gui_var_margin_char;
 
 /*
  * Sound Settings

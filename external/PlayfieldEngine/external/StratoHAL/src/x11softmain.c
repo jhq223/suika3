@@ -99,6 +99,7 @@ static Pixmap icon = BadAlloc;
 static Pixmap icon_mask = BadAlloc;
 static Atom delete_message = BadAlloc;
 static XImage *ximage;
+static bool is_server_big_endian;
 
 /* Image */
 static struct hal_image *back_image;
@@ -126,6 +127,10 @@ extern char *icon_xpm[35];
 /* Callback */
 struct hal_callback hal_callback;
 HAL_DLL bool (*hal_bootstrap_ptr)(char **title, int *width, int *height, struct hal_callback *callback);
+
+/* argc/argv */
+HAL_DLL int hal_argc;
+HAL_DLL char **hal_argv;
 
 /* forward declaration */
 static void init_locale(void);
@@ -168,6 +173,9 @@ hal_main(
 	int argc,
 	char *argv[])
 {
+	hal_argc = argc;
+	hal_argv = argv;
+
 	/* Initialize HAL. */
 	if (!init_hal(argc, argv))
 		return 1;
@@ -336,6 +344,9 @@ bool init_x11_graphics(void)
 			free(pixels);
 			return false;
 		}
+
+		if (ximage->red_mask == 0xff000000)
+			is_server_big_endian = true;
 
 		colormap = XCreateColormap(display, root, vi.visual, AllocNone);
 		if (colormap == None) {
@@ -890,7 +901,20 @@ run_frame(void)
 	/* Flip. */
 	if (flip) {
 		/* Quantize the back image if bpp != 32. */
-		if (bpp == 16) {
+#if defined(HAL_ARCH_BE)
+		if (bpp == 32 && !is_server_big_endian) {
+#else
+		if (bpp == 32 && is_server_big_endian) {
+#endif
+			int x, y;
+			hal_pixel_t *src = (hal_pixel_t *)back_image->pixels;
+			for (y = 0; y < screen_height; y++) {
+				for (x = 0; x < screen_width; x++) {
+					*src = hal_host_to_le_32(*src);
+					src++;
+				}
+			}
+		} else if (bpp == 16) {
 			int x, y;
 			hal_pixel_t *src = (hal_pixel_t *)back_image->pixels;
 			for (y = 0; y < screen_height; y++) {
@@ -977,14 +1001,14 @@ draw_video_frame(void)
 
 	/* Draw. */
 	hal_draw_image_3d_alpha(back_image,
-				dst_x,
-				dst_y,
-				dst_x + dst_width,
-				dst_y,
-				dst_x,
-				dst_y + dst_height,
-				dst_x + dst_width,
-				dst_y + dst_height,
+				(float)dst_x,
+				(float)dst_y,
+				(float)(dst_x + dst_width),
+				(float)dst_y,
+				(float)dst_x,
+				(float)(dst_y + dst_height),
+				(float)(dst_x + dst_width),
+				(float)(dst_y + dst_height),
 				video_image,
 				0,
 				0,
@@ -1848,10 +1872,10 @@ hal_render_image_cross(
 	hal_draw_image_cross(back_image,
 			     src1_img,
 			     src2_img,
-			     src1_left,
-			     src1_top,
-			     src2_left,
-			     src2_top,
+			     (int)src1_left,
+			     (int)src1_top,
+			     (int)src2_left,
+			     (int)src2_top,
 			     alpha);
 }
 

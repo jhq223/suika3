@@ -1,11 +1,7 @@
-file(ARCHIVE_EXTRACT
-  INPUT       ${CMAKE_CURRENT_SOURCE_DIR}/lib/archive/libvorbis-1.3.7.tar.gz
-  DESTINATION ${CMAKE_BINARY_DIR}
+file(
+  COPY        ${CMAKE_CURRENT_SOURCE_DIR}/lib/external/libvorbis-1.3.7/
+  DESTINATION ${CMAKE_BINARY_DIR}/libvorbis
 )
-
-file(GLOB LIBPNG_EXTRACTED_DIR ${CMAKE_BINARY_DIR}/libvorbis-*)
-file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/libvorbis)
-file(RENAME ${LIBPNG_EXTRACTED_DIR} ${CMAKE_BINARY_DIR}/libvorbis)
 
 add_library(vorbisfile OBJECT
   ${CMAKE_BINARY_DIR}/libvorbis/lib/vorbisfile.c
@@ -52,4 +48,9 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 elseif(MSVC)
   target_compile_options(vorbis PRIVATE /W0 /wd4267 /wd4244)
   target_compile_options(vorbisfile PRIVATE /W0 /wd4267 /wd4244)
+endif()
+
+if(STRATO_TARGET_PC98 OR STRATO_TARGET_PCAT)
+  target_compile_definitions(vorbis     PUBLIC HAVE_ALLOCA_H)
+  target_compile_definitions(vorbisfile PUBLIC HAVE_ALLOCA_H)
 endif()

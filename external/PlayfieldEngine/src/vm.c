@@ -58,6 +58,14 @@
 /* NoctLang */
 static NoctVM *vm;
 static NoctEnv *env;
+static NoctConfig config;
+
+/* Startup file path. */
+static const char *startup_file = STARTUP_FILE;
+
+#if defined(PF_USE_UNSAFE)
+static int arg_start;
+#endif
 
 /* Forward Declaration */
 static bool load_startup_file(void);
@@ -73,6 +81,10 @@ static bool get_dict_elem_int_param(NoctEnv *env, const char *name, const char *
 static bool serialize_save_data(NoctEnv *env, NoctValue *value, void *data, size_t buf_size, size_t *ret);
 static bool deserialize_save_data(NoctEnv *env, NoctValue *value, void *data, size_t buf_size);
 static bool install_api(NoctEnv *env);
+#if defined(PF_USE_UNSAFE)
+static bool parse_cli_options(void);
+static bool call_main(void);
+#endif
 
 /* External. */
 PF_DLL extern bool (*pf_init_aot_code_ptr)(struct rt_env *);
@@ -95,8 +107,16 @@ pfi_create_vm(
 	noct_init_locale();
 #endif
 
+	config.jit_threshold = 0;
+
+#if defined(PF_USE_UNSAFE)
+	if (!parse_cli_options())
+		return false;
+#endif
+
 	/* Create a language runtime. */
-	if (!noct_create_vm(&vm, &env, NULL))
+	noct_set_default_config(&config);
+	if (!noct_create_vm(&vm, &env, &config))
 		return false;
 
 	/* Call AOT code registration. */
@@ -113,33 +133,57 @@ pfi_create_vm(
 			return false;
 	}
 
-
-	/* Call "setup()" and get a title and window size. */
-	if (!call_setup(title, width, height, fullscreen)) {
-		const char *file;
-		int line;
-		const char *msg;
-		noct_get_error_file(env, &file);
-		noct_get_error_line(env, &line);
-		noct_get_error_message(env, &msg);
-		hal_log_error(PF_TR("Error: %s:%d: %s"), file, line, msg);
-		return false;
-	}
-
-
 #if defined(PF_USE_UNSAFE)
-	/* Install System.* API. */
-	if (!noct_register_api_system(env))
+	/* Call "setup()" and get a title and window size. */
+	{
+		bool has_main;
+
+		if (!noct_check_global(env, "main", &has_main))
+			return false;
+
+		/* Call "setup()" if "main()" doesn't exist. */
+		if (!has_main) {
+			if (!call_setup(title, width, height, fullscreen))
+				return false;
+		}
+
+		/* Install the Playfield API to the runtime. */
+		if (!install_api(env))
+			return false;
+
+		/* Install System.* API. */
+		if (!noct_register_api_system(env))
+			return false;
+
+		/* Install File.* API. */
+		if (!noct_register_api_file(env))
+			return false;
+
+		/* Initialize the downstream app by the init hook. */
+		if (pf_init_hook_ptr != NULL)
+			pf_init_hook_ptr(*width, *height);
+
+		/* Call "main()" if exists. */
+		if (has_main) {
+			call_main();
+
+			/* Don't continue. */
+			return false;
+		}
+	}
+#else
+	/* Call "setup()". */
+	if (!call_setup(title, width, height, fullscreen))
 		return false;
 
-	/* Install File.* API. */
-	if (!noct_register_api_file(env))
-		return false;
-#endif
-
-	/* Install the custom APIs to the runtime. */
+	/* Install the Playfield API to the runtime. */
 	if (!install_api(env))
 		return false;
+
+	/* Initialize the downstream app by the init hook. */
+	if (pf_init_hook_ptr != NULL)
+		pf_init_hook_ptr(*width, *height);
+#endif
 
 	return true;
 }
@@ -161,7 +205,7 @@ load_startup_file(void)
 	char *buf;
 
 	/* Load a file content, i.e., a script text. */
-	if (!pfi_load_file(STARTUP_FILE, &buf, NULL))
+	if (!pfi_load_file(startup_file, &buf, NULL))
 		return false;
 
 	/* Register the script text to the language runtime. */
@@ -181,7 +225,126 @@ load_startup_file(void)
 	return true;
 }
 
-/* Call "setup()" function to determin a title, width, and height. */
+#if defined(PF_USE_UNSAFE)
+
+extern int hal_argc;
+extern char **hal_argv;
+
+/* Parse the command line arguments. */
+static bool
+parse_cli_options(void)
+{
+	int i;
+
+	for (i = 1; i < hal_argc; i++) {
+		if (hal_argv[i][0] != '-')
+			break;
+
+		if (strcmp(hal_argv[i], "--open") == 0) {
+			/* Ignore: for Portal. */
+			continue;
+		}
+		if (strcmp(hal_argv[i], "--disable-jit") == 0) {
+			config.jit_enable = false;
+			continue;
+		}
+		if (strcmp(hal_argv[i], "--force-jit") == 0) {
+			config.jit_threshold = 0;
+			continue;
+		}
+		if (strncmp(hal_argv[i], "--jit-threshold=", 16) == 0) {
+			config.jit_threshold = atoi(hal_argv[i] + 16);
+			continue;
+		}
+		if (strncmp(hal_argv[i], "--optimize-level=", 17) == 0) {
+			config.optimize_level = atoi(hal_argv[i] + 17);
+			continue;
+		}
+		if (strncmp(hal_argv[i], "--gc-nursery-size=", 18) == 0) {
+			config.gc_nursery_size = (size_t)atoi(hal_argv[i] + 18);
+			continue;
+		}
+		if (strncmp(hal_argv[i], "--gc-graduate-size=", 21) == 0) {
+			config.gc_graduate_size = (size_t)atoi(hal_argv[i] + 21);
+			continue;
+		}
+		if (strncmp(hal_argv[i], "--gc-tenure-size=", 17) == 0) {
+			config.gc_tenure_size = (size_t)atoi(hal_argv[i] + 17);
+			continue;
+		}
+		if (strncmp(hal_argv[i], "--gc-lop-threshold=", 18) == 0) {
+			config.gc_lop_threshold = (size_t)atoi(hal_argv[i] + 18);
+			continue;
+		}
+		if (strncmp(hal_argv[i], "--gc-promotion-threshold=", 25) == 0) {
+			config.gc_promotion_threshold = (size_t)atoi(hal_argv[i] + 25);
+			continue;
+		}
+
+		pf_log_error(PF_TR("Unknown option %s.\n"), hal_argv[1]);
+		return false;
+	}
+
+	if (i < hal_argc) {
+		startup_file = hal_argv[i];
+		arg_start = i + 1;
+	} else {
+		arg_start = i;
+	}
+
+	return true;
+}
+
+/* Call the "main()" function. */
+static bool
+call_main(void)
+{
+        NoctValue ret;
+        NoctValue arg;
+        NoctValue val;
+	size_t index;
+	int i;
+	extern int hal_argc;
+	extern char **hal_argv;
+
+        /* Make "arg" array. */
+        if (!noct_make_empty_array(env, &arg))
+                return false;
+
+	/* Copy argv. */
+	index = -0;
+	for (i = arg_start; i < hal_argc; i++) {
+		const char *v_utf8 = hal_argv[i];
+		if (!noct_set_array_elem_make_string(env, &arg, index++, &val, v_utf8))
+			return false;
+	}
+
+	/* Run main(arg). */
+        if (!noct_enter_vm(env, "main", 1, &arg, &ret)) {
+                const char *file;
+                int line;
+                const char *msg;
+
+                noct_get_error_file(env, &file);
+		if (strcmp(file, "") == 0)
+			file = "main.ray";
+
+                noct_get_error_line(env, &line);
+
+                noct_get_error_message(env, &msg);
+		if (strcmp(msg, "") == 0)
+			msg = "Execution failed.";
+
+                hal_log_error(PF_TR("Error: %s:%d: %s"), file, line, msg);
+                return false;
+        }
+
+        return true;
+}
+
+#endif
+
+/* Call the "setup()" function to determin a title, width, and height. */
 static bool
 call_setup(
 	char **title,
@@ -216,7 +379,7 @@ call_setup(
 		if (width != NULL) {
 			if (!noct_get_dict_elem_cstr(env, &ret, "width", &width_val))
 				break;
-			if (!noct_get_int(env, &width_val, (int32_t *)width))
+			if (!noct_get_int(env, &width_val, width))
 				break;
 		}
 
@@ -224,7 +387,7 @@ call_setup(
 		if (height != NULL) {
 			if (!noct_get_dict_elem_cstr(env, &ret, "height", &height_val))
 				break;
-			if (!noct_get_int(env, &height_val, (int32_t *)height))
+			if (!noct_get_int(env, &height_val, height))
 				break;
 		}
 
@@ -251,9 +414,17 @@ call_setup(
 		const char *file;
 		int line;
 		const char *msg;
+
 		noct_get_error_file(env, &file);
+		if (strcmp(file, "") == 0)
+			file = "main.ray";
+
 		noct_get_error_line(env, &line);
+
 		noct_get_error_message(env, &msg);
+		if (strcmp(msg, "") == 0)
+			msg = "Execution failed.";
+
 		hal_log_error(PF_TR("Error: %s:%d: %s"), file, line, msg);
 		return false;
 	}
@@ -320,7 +491,7 @@ pfi_get_vm_int(
 
 	if (!noct_get_global(env, "Engine", &dict))
 		return false;
-	if (!noct_get_dict_elem_check_int(env, &dict, prop_name, &dict_val, (int32_t *)val))
+	if (!noct_get_dict_elem_check_int(env, &dict, prop_name, &dict_val, val))
 		return false;
 
 	return true;
@@ -401,7 +572,7 @@ static bool serialize_printer(NoctEnv *env, char *buf, size_t size, NoctValue *v
 
 	switch (type) {
 	case NOCT_VALUE_INT:
-		if (!noct_get_int(env, value, (int32_t *)&ival))
+		if (!noct_get_int(env, value, &ival))
 			return false;
 		snprintf(digits, sizeof(digits), "%d", ival);
 		strncat(buf, digits, size);
@@ -1014,7 +1185,7 @@ static bool get_int_param(NoctEnv *env, const char *name, int *ret)
 
 	switch (elem.type) {
 	case NOCT_VALUE_INT:
-		noct_get_int(env, &elem, (int32_t *)ret);
+		noct_get_int(env, &elem, ret);
 		break;
 	case NOCT_VALUE_FLOAT:
 		noct_get_float(env, &elem, &f);
@@ -1055,7 +1226,7 @@ static bool get_string_param(NoctEnv *env, const char *name, const char **ret)
 	case NOCT_VALUE_INT:
 	{
 		int i;
-		noct_get_int(env, &elem, (int32_t *)&i);
+		noct_get_int(env, &elem, &i);
 		snprintf(buf, sizeof(buf), "%d", i);
 		*ret = buf;
 		break;
@@ -1290,7 +1461,7 @@ serialize_save_data_recursively(
 
 	switch (type) {
 	case NOCT_VALUE_INT:
-		if (!noct_get_int(env, value, (int32_t *)&ival))
+		if (!noct_get_int(env, value, &ival))
 			return false;
 		if (!ser_put_u8(ctx, SER_TYPE_INT))
 			return false;

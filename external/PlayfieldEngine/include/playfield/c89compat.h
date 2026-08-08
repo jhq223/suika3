@@ -493,6 +493,7 @@ typedef unsigned long long uint64_t;
 #if defined(__WATCOMC__)
 #if !defined(lroundf)
 #define lroundf round
+#if __WATCOMC__ < 1300
 static INLINE double round(double x)
 {
     if (x >= 0.0)
@@ -500,6 +501,7 @@ static INLINE double round(double x)
     else
 	    return (double)(int)(x - 0.5);
 }
+#endif
 #endif
 #if !defined(floorf)
 #define floorf floor

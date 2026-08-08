@@ -36,9 +36,10 @@
 #include <assert.h>
 
 static const char *prop_names[] = {
-	"fade",
-	"rule",
 	"time",
+	"fade",
+	"method",
+	"rule",
 	"bg",
 	"bg-x",
 	"bg-y",
@@ -373,10 +374,12 @@ init(void)
 
 				is_file_specified = true;
 			}
+			desc[i].param_only = false;
 		} else {
 			/* Not specified, leave the image as is. */
 			desc[i].fname = s3_get_layer_file_name(LAYER_INDEX);
 			desc[i].image = s3_get_layer_image(LAYER_INDEX);
+			desc[i].param_only = true;
 		}
 
 		/* Has a x position argument? */
@@ -626,7 +629,10 @@ init(void)
 	}
 
 	/* Get the fade method. */
-	fade = s3_get_tag_arg_string("fade", true, "normal");
+	if (s3_check_tag_arg("method"))
+		fade = s3_get_tag_arg_string("method", false, NULL);
+	else
+		fade = s3_get_tag_arg_string("fade", true, "normal");
 	fade_method = s3_get_fade_method(fade);
 	if (fade_method == S3_FADE_INVALID) {
 		s3_log_tag_error(S3_TR("Invalid fade method \"%s\"."), fade_method);

@@ -29,6 +29,7 @@
 
 #include <suika3/suika3.h>
 #include "conf.h"
+#include "tag.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -95,6 +96,10 @@ init(void)
 {
 	const char *file;
 	const char *reg_name;
+
+	/* Check properties. */
+	if (!s3i_check_tag_properties(prop_names))
+		return false;
 
 	/* If stop. */
 	if (s3_get_tag_arg_bool("stop", true, false)) {

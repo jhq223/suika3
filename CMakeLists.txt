@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.18)  # Require ARCHIVE_EXTRACT.
-project(suika3 LANGUAGES C CXX)       # Actually only C is required for many platforms.
+project(suika3 LANGUAGES C)
+
+if(   WIN32
+   OR CMAKE_SYSTEM_NAME STREQUAL "Haiku"
+   OR SUIKA_TARGET_OPENHARMONY)
+  enable_language(CXX)
+endif()
 
 # ---
 
@@ -51,12 +57,18 @@ option(SUIKA_TARGET_PSVITA           "Build for PS Vita"                        
 
 #
 # [SUIKA_ENABLE_DIST]
-#  - Build for OS packages such as FreeBSD Ports and Debian packages.
-#  - This configuration uses dynamic linking to system's shared libraries for
-#    dependencies such as libpng, libvorbis, and freetype2.
+#  - For distribution packaging.
+#  - Link all dependencies as shared libraries for packaging.
 #
 option(SUIKA_ENABLE_DIST "Build for OS package" OFF)
-option(SUIKA_ENABLE_DIST_SINGLE "Build for OS package (but suika3-only)" OFF)
+
+#
+# [SUIKA_ENABLE_DIST2]
+#  - For distribution packaging.
+#  - Statically links "Playfield Engine", "StratoHAL", and "NoctLang".
+#  - Other dependencies are linked dynamically.
+#
+option(SUIKA_ENABLE_DIST_CONSERVATIVE "Build for OS package" OFF)
 
 #
 # [SUIKA_ENABLE_INSTALL]
@@ -392,6 +404,10 @@ if(   NOT SUIKA_ENABLE_DIST
     set(PLAYFIELD_ENABLE_STATIC ON)
   endif()
 
+  if(SUIKA_ENABLE_DIST_CONSERVATIVE)
+    set(PLAYFIELD_ENABLE_DIST_CONSERVATIVE ON)
+  endif()
+
   # Use pf_init_hook() function.
   set(PLAYFIELD_ENABLE_INITHOOK  ON)
 
@@ -567,8 +583,13 @@ if(MSVC)
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /DNDEBUG")
 elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
   # GCC/Clang
-  set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2 -g -DNDEBUG")
-  set(CMAKE_OBJC_FLAGS_RELEASE "${CMAKE_OBJC_FLAGS_RELEASE} -O2 -g -DNDEBUG")
+  if(NOT SUIKA_TARGET_WASM)
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2 -g -DNDEBUG")
+    set(CMAKE_OBJC_FLAGS_RELEASE "${CMAKE_OBJC_FLAGS_RELEASE} -O2 -g -DNDEBUG")
+  else()
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2 -DNDEBUG")
+    set(CMAKE_OBJC_FLAGS_RELEASE "${CMAKE_OBJC_FLAGS_RELEASE} -O2 -DNDEBUG")
+  endif()
 endif()
 
 # ---
@@ -583,7 +604,7 @@ if(   SUIKA_TARGET_MACOS
   # Exclude Homebrew packaging.
   #  - Homebrew provides arch-specific libraries.
   #  - If we try to make a fat binary, link will fail.
-  if(NOT SUIKA_ENABLE_DIST)
+  if(NOT SUIKA_ENABLE_DIST AND NOT SUIKA_ENABLE_DIST_CONSERVATIVE)
     set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "" FORCE)
   endif()
 endif()
@@ -745,29 +766,39 @@ if(   SUIKA_ENABLE_STATIC
     set(SUIKA_LIB_TYPE OBJECT)
   endif()
 
-  # Link dependencies into the library if not packaing.
-  if(NOT SUIKA_ENABLE_DIST)
-    if(NOT SUIKA_TARGET_PC98 AND NOT SUIKA_TARGET_PCAT)
+  # Link dependencies into the library.
+  if(NOT SUIKA_ENABLE_DIST AND NOT SUIKA_ENABLE_DIST_CONSERVATIVE)
+    if(   SUIKA_TARGET_PC98
+       OR SUIKA_TARGET_PCAT
+       OR SUIKA_TARGET_MACOS7)
       set(SUIKA_DEPS
           $<TARGET_OBJECTS:png>
-          $<TARGET_OBJECTS:jpeg>
-          $<TARGET_OBJECTS:webp>
-          $<TARGET_OBJECTS:vorbisfile>
-          $<TARGET_OBJECTS:vorbis>
-          $<TARGET_OBJECTS:ogg>
           $<TARGET_OBJECTS:freetype>
+          $<TARGET_OBJECTS:tremor>
+          $<TARGET_OBJECTS:ogg>
           $<TARGET_OBJECTS:z>
       )
     else()
-      set(SUIKA_DEPS
+      if(NOT CMAKE_C_COMPILER_ID MATCHES "Watcom")
+        set(SUIKA_DEPS
           $<TARGET_OBJECTS:png>
           $<TARGET_OBJECTS:jpeg>
-          $<TARGET_OBJECTS:vorbisfile>
-          $<TARGET_OBJECTS:vorbis>
+          $<TARGET_OBJECTS:webp>
+          $<TARGET_OBJECTS:tremor>
           $<TARGET_OBJECTS:ogg>
           $<TARGET_OBJECTS:freetype>
           $<TARGET_OBJECTS:z>
-      )
+        )
+      else()
+        set(SUIKA_DEPS
+          $<TARGET_OBJECTS:png>
+          $<TARGET_OBJECTS:jpeg>
+          $<TARGET_OBJECTS:tremor>
+          $<TARGET_OBJECTS:ogg>
+          $<TARGET_OBJECTS:freetype>
+          $<TARGET_OBJECTS:z>
+        )
+      endif()
     endif()
   endif()
 
@@ -834,7 +865,7 @@ endif()
 if(SUIKA_TARGET_WINDOWS95)
   if(MSVC)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
-  else()
+  elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
     add_compile_definitions(_WIN32_WINNT=0x0400 __USE_MINGW_ANSI_STDIO=1)
     add_definitions(-UUNICODE -U_UNICODE)
   endif()
@@ -901,7 +932,7 @@ endif()
 if(SUIKA_TARGET_WINDOWS)
   if(MSVC)
     target_compile_options(suika3 PRIVATE /utf-8)
-  else()
+  elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
     target_compile_options(suika3 PRIVATE -municode -finput-charset=utf-8 -fexec-charset=utf-8)
   endif()
 endif()
@@ -910,7 +941,7 @@ endif()
 if(SUIKA_TARGET_WINDOWS95)
   if(MSVC)
     target_compile_options(suika3 PRIVATE /utf-8)
-  else()
+  elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
     target_compile_options(suika3 PRIVATE -finput-charset=utf-8 -fexec-charset=shift-jis)
   endif()
 endif()
@@ -922,26 +953,38 @@ endif()
 #
 
 # Link Playfield Engine
-if(NOT SUIKA_ENABLE_DIST)
+if(SUIKA_ENABLE_DIST)
   if(SUIKA_ENABLE_UNSAFE)
-    set(NOCTAPI_LIB noctapi)
+    set(NOCTAPI_LIB Noct::api)
   endif()
-
-  target_link_libraries(suika3 PRIVATE
-    playfield
-    strato
-    playfield  # Specify twice to resolve circular references.
-    noct
-    ${NOCTAPI_LIB}
-  )
-else()
   target_link_libraries(suika3 PRIVATE
     Playfield::playfield
     StratoHAL::strato
     Playfield::playfield  # Specify twice to resolve circular references.
+    ${NOCTAPI_LIB}
     Noct::noct
-    Noct::api
-    noctapi
+  )
+elseif(SUIKA_ENABLE_DIST_CONSERVATIVE)
+  if(SUIKA_ENABLE_UNSAFE)
+    set(NOCTAPI_LIB noctapi)
+  endif()
+  target_link_libraries(suika3 PRIVATE
+    playfield
+    strato
+    playfield  # Specify twice to resolve circular references.
+    ${NOCTAPI_LIB}
+    noct
+  )
+else()
+  if(SUIKA_ENABLE_UNSAFE)
+    set(NOCTAPI_LIB noctapi)
+  endif()
+  target_link_libraries(suika3 PRIVATE
+    playfield
+    strato
+    playfield  # Specify twice to resolve circular references.
+    ${NOCTAPI_LIB}
+    noct
   )
 endif()
 
@@ -953,7 +996,7 @@ if(SUIKA_TARGET_WINDOWS)
     else()
       target_link_options(suika3 PRIVATE /SUBSYSTEM:CONSOLE /ENTRY:wWinMainCRTStartup /MANIFEST:NO)
 	endif()
-  else()
+  elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
     if(NOT SUIKA_ENABLE_CONSOLE)
       target_link_options(suika3 PRIVATE -mwindows -static -static-libgcc -Wl,-u,wWinMain -Wl,-u,_wWinMain@16)
     else()
@@ -966,7 +1009,7 @@ endif()
 if(SUIKA_TARGET_WINDOWS95)
   if(MSVC)
     target_link_options(suika3 PRIVATE /SUBSYSTEM:WINDOWS)
-  else()
+  elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
     target_link_options(suika3 PRIVATE -mwindows -static -static-libgcc -Wl,-u,WinMain -Wl,-u,_WinMain@16)
   endif()
 endif()
@@ -1001,6 +1044,7 @@ if(   SUIKA_TARGET_LINUX
    OR SUIKA_TARGET_GENERICUNIX
    OR SUIKA_TARGET_HAIKU)
   target_link_libraries(suika3 PRIVATE m)
+  target_link_libraries(suika3 PRIVATE zstd)
 endif()
 
 # Emscripten
@@ -1019,7 +1063,6 @@ if(SUIKA_TARGET_WASM)
     --shell-file "${CMAKE_CURRENT_SOURCE_DIR}/src/shell.html"
     --pre-js "${CMAKE_CURRENT_SOURCE_DIR}/src/pre.js"
     --use-preload-plugins
-    --profiling-funcs
   )
 endif()
 
@@ -1219,10 +1262,12 @@ if(SUIKA_TARGET_MACOS7)
   add_custom_command(TARGET suika3 POST_BUILD COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/resources/scripts/macbinary2.py")
 
   # Make a disk image.
-  add_custom_command(TARGET suika3 POST_BUILD COMMAND dd if=/dev/zero of=suika3-macos7.dsk bs=1024 count=2880)
+  #add_custom_command(TARGET suika3 POST_BUILD COMMAND dd if=/dev/zero of=suika3-macos7.dsk bs=1024 count=2880)
+  add_custom_command(TARGET suika3 POST_BUILD COMMAND dd if=/dev/zero of=suika3-macos7.dsk bs=1024 count=5760)
   add_custom_command(TARGET suika3 POST_BUILD COMMAND hformat -l "Suika3" suika3-macos7.dsk)
   add_custom_command(TARGET suika3 POST_BUILD COMMAND hmount suika3-macos7.dsk)
   add_custom_command(TARGET suika3 POST_BUILD COMMAND hcopy suika3.bin :suika3)
+  #add_custom_command(TARGET suika3 POST_BUILD COMMAND hcopy assets.arc :assets.arc)
   add_custom_command(TARGET suika3 POST_BUILD COMMAND humount)
 endif()
 
@@ -1349,52 +1394,56 @@ if(SUIKA_ENABLE_INSTALL)
   # Install the sample files.
   #
 
-  if(SUIKA_ENABLE_DIST AND NOT SUIKA_ENABLE_FLATPAK)
-    # Exclude the font when packaging.
-    # (A symlink to a system font should be created by packaging process.)
-    install(
-      DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/game/"
-      DESTINATION "${SUIKA_DIR_SAMPLE}"
-      FILES_MATCHING
-      PATTERN "*"
-      PATTERN "system/font/*" EXCLUDE
-    )
-    install(
-      DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/resources/elisp/"
-      DESTINATION "${SUIKA_DIR_ELISP}"
-    )
-  else()
-    # Include the font.
-    install(
-      DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/game/"
-      DESTINATION "${SUIKA_DIR_SAMPLE}"
-    )
-    install(
-      DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/resources/elisp/"
-      DESTINATION "${SUIKA_DIR_ELISP}"
-    )
+  if(SUIKA_ENABLE_DIST OR SUIKA_ENABLE_DIST_CONSERVATIVE)
+    if(NOT SUIKA_ENABLE_FLATPAK)
+      # Exclude the font when packaging.
+      # (A symlink to a system font should be created by packaging process.)
+      install(
+        DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/game/"
+        DESTINATION "${SUIKA_DIR_SAMPLE}"
+        FILES_MATCHING
+        PATTERN "*"
+        PATTERN "system/font/*" EXCLUDE
+      )
+      install(
+        DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/resources/elisp/"
+        DESTINATION "${SUIKA_DIR_ELISP}"
+      )
+    else()
+      # Include the font.
+      install(
+        DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/game/"
+        DESTINATION "${SUIKA_DIR_SAMPLE}"
+      )
+      install(
+        DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/resources/elisp/"
+        DESTINATION "${SUIKA_DIR_ELISP}"
+      )
+    endif()
   endif()
 
   #
   # Install the launcher files.
   #
 
-  if(SUIKA_ENABLE_DIST AND NOT SUIKA_ENABLE_FLATPAK)
-    # Exclude the font when packaging.
-    # (A symlink to a system font should be created by packaging process.)
-    install(
-      DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/resources/launcher/"
-      DESTINATION "${SUIKA_DIR_LAUNCHER}"
-      FILES_MATCHING
-      PATTERN "*"
-      PATTERN "system/font/*" EXCLUDE
-    )
-  else()
-    # Include the font.
-    install(
-      DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/resources/launcher/"
-      DESTINATION "${SUIKA_DIR_LAUNCHER}"
-    )
+  if(SUIKA_ENABLE_DIST OR SUIKA_ENABLE_DIST_CONSERVATIVE)
+    if(NOT SUIKA_ENABLE_FLATPAK)
+      # Exclude the font when packaging.
+      # (A symlink to a system font should be created by packaging process.)
+      install(
+        DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/resources/launcher/"
+        DESTINATION "${SUIKA_DIR_LAUNCHER}"
+        FILES_MATCHING
+        PATTERN "*"
+        PATTERN "system/font/*" EXCLUDE
+      )
+    else()
+      # Include the font.
+      install(
+        DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/resources/launcher/"
+        DESTINATION "${SUIKA_DIR_LAUNCHER}"
+      )
+    endif()
   endif()
 
   #
@@ -1417,7 +1466,7 @@ if(SUIKA_ENABLE_INSTALL)
     )
 
     # Run update if not packaging.
-    if(NOT SUIKA_ENABLE_DIST)
+    if(NOT SUIKA_ENABLE_DIST AND NOT SUIKA_ENABLE_DIST_CONSERVATIVE)
       find_program(UPDATE_DESKTOP_DATABASE_EXECUTABLE NAMES update-desktop-database)
       find_program(UPDATE_MIME_DATABASE_EXECUTABLE NAMES update-mime-database)
       if(UPDATE_DESKTOP_DATABASE_EXECUTABLE)
@@ -1436,6 +1485,8 @@ if(SUIKA_ENABLE_INSTALL)
           )
         ")
       endif()
-    endif() # NOT SUIKA_ENABLE_DIST
+    endif()
+
   endif() # SUIKA_ENABLE_FREEDESKTOP
+
 endif()

@@ -30,6 +30,10 @@
 
 #include <strato/strato.h>
 
+#if defined(HAL_TARGET_PC98)
+void hal_poll_sound(void);
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -284,9 +288,15 @@ hal_clear_image_rect(
 
 	/* Clear pixels of a rectangle. */
 	pixels = img->pixels;
-	for (i = y; i < y + h; i++)
+	for (i = y; i < y + h; i++) {
+#if defined(HAL_TARGET_PC98)
+		/* Let the sound buffer be refilled while we clear the screen. */
+		if ((i & 31) == 0)
+			hal_poll_sound();
+#endif
 		for (j = x; j < x + w; j++)
 			pixels[img->width * i + j] = color;
+	}
 
 	/* Request a texture update. */
 	hal_notify_image_update(img);
@@ -1492,8 +1502,10 @@ struct png_reader {
 	size_t pos;
 };
 
-static void png_read_callback(png_structp png_ptr, png_bytep buf, png_size_t len);
-static void png_warning_silent(png_structp png_ptr, png_const_charp warning_msg);
+static void png_user_read_callback(png_structp png_ptr, png_bytep buf, png_size_t len);
+static void png_user_warning_silent(png_structp png_ptr, png_const_charp warning_msg);
+static void png_user_write_data(png_structp png_ptr, png_bytep data, png_size_t length);
+static void png_user_flush_data(png_structp png_ptr);
 
 /*
  * Create an image with a PNG file.
@@ -1549,8 +1561,8 @@ hal_create_image_with_png(
 	reader.data = data + 8;
 	reader.size = size;
 	reader.pos = 0;
-	png_set_read_fn(png_ptr, &reader, png_read_callback);
-	png_set_error_fn(png_ptr, NULL, NULL, png_warning_silent);
+	png_set_read_fn(png_ptr, &reader, png_user_read_callback);
+	png_set_error_fn(png_ptr, NULL, NULL, png_user_warning_silent);
 	png_set_sig_bytes(png_ptr, 8);
 	png_read_info(png_ptr, info_ptr);
 
@@ -1630,11 +1642,23 @@ hal_create_image_with_png(
 	png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
 	free(rows);
 
+#ifdef HAL_ARCH_BE
+	{
+		int x;
+		for (y = 0 ; y < height; y++) {
+			for (x = 0; x < width; x++) {
+				(*img)->pixels[y * width + x] =
+					hal_le_to_host_32((*img)->pixels[y * width + x]);
+			}
+		}
+       }
+#endif
+
 	return true;
 }
 
 static void
-png_read_callback(
+png_user_read_callback(
 	png_structp png_ptr,
 	png_bytep buf,
 	png_size_t len)
@@ -1652,7 +1676,7 @@ png_read_callback(
 }
 
 static void
-png_warning_silent(
+png_user_warning_silent(
 	png_structp png_ptr,
 	png_const_charp warning_msg)
 {
@@ -1660,6 +1684,92 @@ png_warning_silent(
 	UNUSED_PARAMETER(warning_msg);
 }
 
+#if defined(__GNUC__) && !defined(__llvm__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wclobbered"
+#endif
+bool
+hal_write_image(
+	struct hal_image *image,
+	struct hal_wfile *wf)
+{
+	png_structp png;
+	png_infop info;
+	png_bytep *row_pointers;
+	int y;
+
+	row_pointers = malloc(sizeof(png_bytep) * (size_t)image->height);
+	if (row_pointers == NULL) {
+		hal_log_out_of_memory();
+		return false;
+	}
+	for (y = 0; y < image->height; y++)
+		row_pointers[y] = (png_bytep)&image->pixels[image->width * y];
+
+	png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+	if (png == NULL) {
+		free(row_pointers);
+		return false;
+	}
+
+	info = png_create_info_struct(png);
+	if (info == NULL) {
+		free(row_pointers);
+		png_destroy_write_struct(&png, NULL);
+		return false;
+	}
+
+	if (setjmp(png_jmpbuf(png))) {
+		free(row_pointers);
+		png_destroy_write_struct(&png, &info);
+		return false;
+	}
+
+	png_set_write_fn(png, wf, png_user_write_data, png_user_flush_data);
+        png_set_IHDR(png, info,
+                     (png_uint_32)image->width,
+                     (png_uint_32)image->height,
+                     8,
+                     PNG_COLOR_TYPE_RGBA,
+                     PNG_INTERLACE_NONE,
+                     PNG_COMPRESSION_TYPE_DEFAULT,
+                     PNG_FILTER_TYPE_DEFAULT);
+#if !defined(HAL_ORDER_OPENGL)
+        png_set_bgr(png);
+#endif
+        png_write_info(png, info);
+        png_write_image(png, row_pointers);
+        png_write_end(png, NULL);
+        png_destroy_write_struct(&png, &info);
+
+	free(row_pointers);
+
+	return true;
+}
+#if defined(__GNUC__) && !defined(__llvm__)
+#pragma GCC diagnostic pop
+#endif
+
+static void
+png_user_write_data(
+	png_structp png_ptr,
+	png_bytep data,
+	png_size_t length)
+{
+	struct hal_wfile *wf;
+	size_t ret;
+
+	wf = png_get_io_ptr(png_ptr);
+	hal_write_wfile_plain(wf, data, length, &ret);
+}
+
+static void
+png_user_flush_data(
+	png_structp png_ptr)
+{
+	UNUSED_PARAMETER(png_ptr);
+}
+	
 /*
  * JPEG
  */
@@ -1775,8 +1885,7 @@ hal_create_image_with_jpeg(
 /*
  * WebP
  */
-
-#if !defined(HAL_TARGET_PC98) && !defined(HAL_TARGET_PCAT)
+#if !defined(HAL_TARGET_PC98) && !defined(HAL_TARGET_PCAT) && !defined(HAL_OPENWATCOM)
 
 #include <webp/decode.h>
 
@@ -1810,28 +1919,28 @@ hal_create_image_with_webp(
 		return false;
 	}
 
-	/* Copy pixels. */
-	p = (*img)->pixels;
-#if defined(HAL_ORDER_OPENGL)
-	/* Use RGBA as is. */
-	for (y = 0; y < height; y++) {
-		for (x = 0; x < width; x++) {
-			*p++ = hal_make_pixel(pixels[y * width * 4 + x * 4 + 3],
-					      pixels[y * width * 4 + x * 4 + 0],
-					      pixels[y * width * 4 + x * 4 + 1],
-					      pixels[y * width * 4 + x * 4 + 2]);
-		}
-	}
+        /* Copy pixels. */
+        p = (*img)->pixels;
+#if !defined(HAL_ORDER_OPENGL)
+        /* Use RGBA as is. */
+        for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                        *p++ = hal_make_pixel(pixels[y * width * 4 + x * 4 + 3],
+                                              pixels[y * width * 4 + x * 4 + 0],
+                                              pixels[y * width * 4 + x * 4 + 1],
+                                              pixels[y * width * 4 + x * 4 + 2]);
+                }
+        }
 #else
-	/* Reverse the pixel order for OpenGL. (RGB -> BGR) */
-	for (y = 0; y < height; y++) {
-		for (x = 0; x < width; x++) {
-			*p++ = hal_make_pixel(pixels[y * width * 4 + x * 4 + 3],
-					      pixels[y * width * 4 + x * 4 + 2],
-					      pixels[y * width * 4 + x * 4 + 1],
-					      pixels[y * width * 4 + x * 4 + 0]);
-		}
-	}
+        /* Reverse the pixel order for OpenGL. (RGB -> BGR) */
+        for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                        *p++ = hal_make_pixel(pixels[y * width * 4 + x * 4 + 3],
+                                              pixels[y * width * 4 + x * 4 + 2],
+                                              pixels[y * width * 4 + x * 4 + 1],
+                                              pixels[y * width * 4 + x * 4 + 0]);
+                }
+        }
 #endif
 
 	/* Cleanup. */
@@ -1857,3 +1966,85 @@ hal_create_image_with_webp(
 }
 
 #endif /* !defined(HAL_TARGET_PC98) && !defined(HAL_TARGET_PCAT) */
+
+/*
+ * HCG Image
+ */
+
+#undef HCG_ENABLED
+
+bool hcg_decode(const uint8_t *data_ptr, size_t data_size, uint32_t **dst_pixels, size_t *dst_width, size_t *dst_height);
+bool hcg_encode(uint32_t *src_ptr, size_t src_width, size_t src_height, void (*output_func)(void *ptr, size_t size, void *arg), void *arg);
+static void hcg_output_handler(void *ptr, size_t size, void *arg);
+
+/*
+ * Create an image with an HCG file.
+ */
+bool
+hal_create_image_with_hcg(
+	const uint8_t *data,
+	size_t size,
+	struct hal_image **img)
+{
+#ifdef HCG_ENABLED
+	uint32_t *pixels, *src, *dst;
+	size_t width, height, y, x;
+
+	/* Decode. */
+	if (!hcg_decode(data, size, &pixels, &width, &height))
+		return false;
+
+	/* Create an image. */
+	if (!hal_create_image((int)width, (int)height, img))
+		return false;
+
+	src = pixels;
+	dst = (*img)->pixels;
+	for (y = 0; y < height; y++)
+		for (x = 0; x < width; x++)
+			*dst++ = *src++;
+	free(pixels);
+			
+	return true;
+#else
+	UNUSED_PARAMETER(data);
+	UNUSED_PARAMETER(size);
+	UNUSED_PARAMETER(img);
+
+	return false;
+#endif
+}
+
+/*
+ * Write an image to an HCG file.
+ */
+bool
+hal_write_image_hcg(
+	struct hal_image *image,
+	struct hal_wfile *wf)
+{
+#ifdef HCG_ENABLED
+	if (!hcg_encode(image->pixels,
+			(size_t)image->width,
+			(size_t)image->height,
+			hcg_output_handler,
+			wf))
+		return false;
+
+	return true;
+#else
+	return false;
+#endif
+}
+
+#ifdef HCG_ENABLED
+void hcg_output_handler(void *ptr, size_t size, void *arg)
+{
+	struct hal_wfile *wf;
+	size_t ret;
+
+	wf = (struct hal_wfile *) arg;
+
+	hal_write_wfile_plain(wf, ptr, size, &ret);
+}
+#endif

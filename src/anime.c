@@ -46,7 +46,12 @@
 /*
  * Maximum number of the anime sequences per a layer.
  */
+
+#if defined(HAL_TARGET_PC98) || defined(HAL_TARGET_PCTA)
+#define SEQUENCE_COUNT		(32)
+#else
 #define SEQUENCE_COUNT		(1024)
+#endif
 
 /*
  * Anime sequence.
@@ -1148,10 +1153,10 @@ synthesis_eye_anime(
 				s3_add_anime_sequence_property_f("end",	        ofs_time);
 				s3_add_anime_sequence_property_i("from-x",	x);
 				s3_add_anime_sequence_property_i("from-y",	y);
-				s3_add_anime_sequence_property_i("from-a",	255);
+				s3_add_anime_sequence_property_i("from-a",	s3_get_layer_alpha(base_layer));
 				s3_add_anime_sequence_property_i("to-x",	x);
 				s3_add_anime_sequence_property_i("to-y",	y);
-				s3_add_anime_sequence_property_i("to-a",	255);
+				s3_add_anime_sequence_property_i("to-a",	s3_get_layer_alpha(base_layer));
 				s3_add_anime_sequence_property_i("frame",	i);
 			}
 		}
@@ -1161,7 +1166,7 @@ synthesis_eye_anime(
 			s3_new_anime_sequence(eye_layer);
 			s3_add_anime_sequence_property_f("start",	ofs_time);
 			ofs_time += base_time;
-			s3_add_anime_sequence_property_f("end",	ofs_time);
+			s3_add_anime_sequence_property_f("end",		ofs_time);
 			s3_add_anime_sequence_property_i("from-x",	x);
 			s3_add_anime_sequence_property_i("from-y",	y);
 			s3_add_anime_sequence_property_i("to-x",	x);
